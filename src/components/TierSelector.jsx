@@ -32,7 +32,7 @@ export default function EmpiCraftTierSelector() {
 
       if (!savedTrial) {
         setTimeLeft({
-          days: 90,
+          days: 0,
           hrs: 0,
           mins: 0,
           secs: 0,
@@ -44,7 +44,7 @@ export default function EmpiCraftTierSelector() {
       const endDate = new Date(startDate);
 
       // add 90 days = approx 3 months
-      endDate.setDate(endDate.getDate() + 90);
+      endDate.setDate(endDate.getDate() + 21);
 
       const now = new Date();
       const diff = endDate - now;
@@ -223,7 +223,7 @@ const handleLogout = async () => {
                 <Feature text="Smart Chat" />
                 <Feature text="Doubt Resolver" />
                 <Feature text="Study Companion" />
-                <Feature text="Blog Builder" />
+                <Feature text="Block Builder" />
               </div>
             </div>
 
@@ -261,7 +261,7 @@ const handleLogout = async () => {
                 <Feature text="Smart Chat" />
                 <Feature text="Doubt Solver" />
                 <Feature text="Study Companion" />
-                <Feature text="Blog Builder" />
+                <Feature text="Block Builder" />
                 <Feature text="Test Review" />
                 <Feature text="Quiz Arena" />
                 <Feature text="Study Planner" />
@@ -324,7 +324,7 @@ const handleLogout = async () => {
               </div>
 
               <div style={styles.rightList}>
-                <Feature text="Skill Hub" />
+                
                 <Feature text="Career Detector" />
                 <Feature text="Project Builder" />
               </div>
@@ -359,7 +359,7 @@ const handleLogout = async () => {
 
         <div style={styles.cardsWrap}>
           {[
-            ["🧠", "Skill Hub"],
+            
             ["🎯", "Career Detector"],
             ["🚀", "Project Builder"],
           ].map((item, i) => (

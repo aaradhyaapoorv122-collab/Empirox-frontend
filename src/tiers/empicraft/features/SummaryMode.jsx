@@ -29,16 +29,24 @@ export default function AiSummaryMode({ smartChatMemory = "" }) {
   const [doubtInput, setDoubtInput] = useState("");
   const [doubtReply, setDoubtReply] = useState("");
   const [asking, setAsking] = useState(false);
-
+const [savedSummaries, setSavedSummaries] = useState([]);
+const [selectedSummary, setSelectedSummary] = useState(null);
+const [loadingList, setLoadingList] = useState(false);
   /* ================= LOAD USER ================= */
   useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setCurrentUser(data?.user || null);
-    };
-    getUser();
-  }, []);
+  const init = async () => {
+    const { data } = await supabase.auth.getUser();
+    const user = data?.user || null;
 
+    setCurrentUser(user);
+
+    if (user?.id) {
+      fetchSummaries(user.id);
+    }
+  };
+
+  init();
+}, []);
   /* ================= PREFILL ================= */
   useEffect(() => {
     if (smartChatMemory) setInput(smartChatMemory);
@@ -120,6 +128,49 @@ RULES:
     }
   };
 
+  const fetchSummaries = async (userId) => {
+  if (!userId) return;
+
+  setLoadingList(true);
+
+  try {
+    const { data, error } = await supabase
+      .from("files")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("type", "summary_note")
+      .order("id", { ascending: false });
+
+    if (error) throw error;
+
+    setSavedSummaries(data || []);
+  } catch (err) {
+    console.log("Fetch error:", err);
+  }
+
+  setLoadingList(false);
+};
+
+const deleteSummary = async (id) => {
+  try {
+    const { error } = await supabase
+      .from("files")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+
+    setSavedSummaries((prev) =>
+      prev.filter((item) => item.id !== id)
+    );
+
+    if (selectedSummary?.id === id) {
+      setSelectedSummary(null);
+    }
+  } catch (err) {
+    console.log("Delete error:", err);
+  }
+};
   /* ================= GENERATE ================= */
   const generateSummary = async () => {
     if (!input.trim()) return;
@@ -172,7 +223,7 @@ RULES:
 
       if (error) throw error;
 
-      alert("✅ Summary saved successfully!");
+      fetchSummaries();
     } catch (e) {
       alert("⚠️ Failed to save summary.");
     }
@@ -260,6 +311,62 @@ Explain in simple student-friendly language.
           </select>
         </div>
 
+           {/* SAVED SUMMARIES LIST */}
+<div style={{ marginBottom: 18 }}>
+  <h3 style={{ color: "#D4AF37", marginBottom: 10 }}>
+    📚 Your Saved Summaries
+  </h3>
+
+  {loadingList ? (
+    <p>Loading...</p>
+  ) : savedSummaries.length === 0 ? (
+    <p style={{ color: "#888" }}>No summaries yet</p>
+  ) : (
+    savedSummaries.map((item) => (
+      <div
+        key={item.id}
+        style={{
+          padding: 12,
+          marginBottom: 10,
+          borderRadius: 12,
+          border: "1px solid rgba(255,215,0,0.15)",
+          background: "rgba(0,0,0,0.6)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          cursor: "pointer",
+        }}
+      >
+        {/* TITLE CLICK */}
+        <div
+          onClick={() => setSelectedSummary(item)}
+          style={{ flex: 1 }}
+        >
+          <b style={{ color: "#EAEAEA" }}>
+            📌 {item.title}
+          </b>
+          <div style={{ fontSize: 12, color: "#888" }}>
+            {new Date(item.created_at).toLocaleString()}
+          </div>
+        </div>
+
+        {/* DELETE */}
+        <button
+          onClick={() => deleteSummary(item.id)}
+          style={{
+            background: "transparent",
+            border: "1px solid red",
+            color: "red",
+            padding: "6px 10px",
+            borderRadius: 8,
+          }}
+        >
+          🗑️
+        </button>
+      </div>
+    ))
+  )}
+</div>
         {/* INPUT */}
         <textarea
           style={styles.textarea}
@@ -338,10 +445,66 @@ Explain in simple student-friendly language.
                 <div style={styles.doubtBox}>
                   <pre style={styles.pre}>{doubtReply}</pre>
                 </div>
+                
               )}
             </div>
           </div>
         )}
+        {selectedSummary && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.85)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+      zIndex: 999,
+    }}
+    onClick={() => setSelectedSummary(null)}
+  >
+    <div
+      style={{
+        maxWidth: 700,
+        width: "100%",
+        background: "#111",
+        borderRadius: 16,
+        padding: 20,
+        border: "1px solid rgba(255,215,0,0.2)",
+        maxHeight: "80vh",
+        overflowY: "auto",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h3 style={{ color: "#D4AF37" }}>
+        📄 {selectedSummary.title}
+      </h3>
+
+      <pre style={{ whiteSpace: "pre-wrap", color: "#EAEAEA" }}>
+        {selectedSummary.content}
+      </pre>
+
+      <button
+        onClick={() => setSelectedSummary(null)}
+        style={{
+          marginTop: 12,
+          padding: 10,
+          width: "100%",
+          borderRadius: 10,
+          background: "#D4AF37",
+          border: "none",
+          fontWeight: "bold",
+        }}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );

@@ -26,7 +26,7 @@ import StudyCompanion from "./tiers/empicraft/features/StudyCompanion";
 import SkillHub from "./tiers/empicraft/features/SkillHub";
 import ProjectMaker from "./tiers/empicraft/features/ProjectMaker";
 import CareerDetector from "./tiers/empicraft/features/CareerDetector";
-
+import ResetPassword from "./tiers/empicraft/features/ResetPassword";
 
 export default function App() {
   const { user, loadingUser } = useContext(AuthContext);
@@ -79,7 +79,9 @@ export default function App() {
             <Route path="/empicraft/career-detector" element={<CareerDetector />} />
             <Route path="/empicraft/project-maker" element={<ProjectMaker />} />
             <Route path="/empicraft/Skill-Hub" element={<SkillHub />} />
-          </Route>
+            <Route path="reset-password" element={<ResetPassword />} />
+            </Route>
+ 
 
          
 

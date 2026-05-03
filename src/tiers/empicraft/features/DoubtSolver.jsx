@@ -14,7 +14,8 @@ export default function AIDoubtResolver() {
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [toast, setToast] = useState("");
- 
+ const [savedNotes, setSavedNotes] = useState([]);
+const [selectedSaved, setSelectedSaved] = useState(null);
 
   /* ================= TOAST ================= */
   const showToast = (msg) => {
@@ -24,14 +25,13 @@ export default function AIDoubtResolver() {
 
   /* ================= LOAD SAVED ================= */
   useEffect(() => {
-    const saved = localStorage.getItem("doubt_saved_notes");
-    if (saved) {
-      try {
-        setAnswers(JSON.parse(saved));
-      } catch {}
-    }
-  }, []);
-
+  const saved = localStorage.getItem("doubt_saved_notes");
+  if (saved) {
+    try {
+      setSavedNotes(JSON.parse(saved));
+    } catch {}
+  }
+}, []);
   /* ================= FILE READ ================= */
   const readFile = async (file) => {
     if (!file) return;
@@ -181,138 +181,252 @@ Rules:
   };
 
   /* ================= SAVE ================= */
-  const saveAnswer = (item) => {
-    const old = JSON.parse(localStorage.getItem("doubt_saved_notes") || "[]");
+ const saveAnswer = (item) => {
+  if (!item) return;
 
-    const updated = [item, ...old];
-    localStorage.setItem("doubt_saved_notes", JSON.stringify(updated));
+  const old = JSON.parse(localStorage.getItem("doubt_saved_notes") || "[]");
 
-    showToast("💾 Saved");
+  const newItem = {
+    id: item.id || Date.now(),
+    q: item.q || "Untitled question",
+    a: item.a || "No answer",
+    time: item.time || new Date().toLocaleTimeString(),
   };
 
+  const updated = [newItem, ...old];
+
+  localStorage.setItem("doubt_saved_notes", JSON.stringify(updated));
+  setSavedNotes(updated);
+
+  showToast("💾 Saved to sidebar");
+};
+const deleteSaved = (id) => {
+  const old = JSON.parse(localStorage.getItem("doubt_saved_notes") || "[]");
+
+  const updated = old.filter((item) => item.id !== id);
+
+  localStorage.setItem("doubt_saved_notes", JSON.stringify(updated));
+  setSavedNotes(updated);
+
+  showToast("🗑️ Deleted from sidebar");
+};
+
   return (
-    <div style={styles.page}>
-      {toast && <div style={styles.toast}>{toast}</div>}
+  <div style={styles.page}>
+    {toast && <div style={styles.toast}>{toast}</div>}
 
-      <div style={styles.container}>
-        {/* HEADER */}
-        <div style={styles.header}>
-          <h1 style={styles.title}>👑 AI Doubt Resolver</h1>
-          <p style={styles.subtitle}>
-            Premium instant teacher for Maths, Science, English & more
-          </p>
-        </div>
+    <div style={styles.container}>
 
-        {/* INPUT CARD */}
-        <div style={styles.card}>
-          {/* DROP ZONE */}
-          <div
-            style={{
-              ...styles.dropZone,
-              borderColor: dragOver ? "#facc15" : "#3f3f46",
-              background: dragOver ? "#2a2208" : "#161616",
-            }}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current.click()}
-          >
-            <input
-              type="file"
-              hidden
-              ref={fileInputRef}
-              onChange={handleSelectFile}
-            />
+      <div style={styles.layout}>
 
-            {fileName ? (
-              <div>
-                <div style={styles.fileOk}>📄 {fileName}</div>
-                <div style={styles.fileSub}>Tap to change file</div>
-              </div>
-            ) : (
-              <div>
-                <div style={styles.fileMain}>📎 Upload or Drop File</div>
-                <div style={styles.fileSub}>
-                  Notes / Worksheet / Question Paper
-                </div>
-              </div>
-            )}
-          </div>
+        {/* SIDEBAR */}
+        <div style={styles.sidebar}>
+          <h3 style={{ color: "#facc15" }}>📚 Saved Doubts</h3>
 
-          {/* QUESTION */}
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Type your doubt here..."
-            style={styles.textarea}
-          />
-
-          <button
-            onClick={handleAsk}
-            disabled={loading}
-            style={{
-              ...styles.mainBtn,
-              opacity: loading ? 0.7 : 1,
-            }}
-          >
-            {loading ? "🤖 Solving..." : "✨ Solve My Doubt"}
-          </button>
-        </div>
-
-        {/* ANSWERS */}
-        <div style={styles.answerWrap}>
-          {answers.length === 0 ? (
-            <div style={styles.empty}>
-              Your solved doubts will appear here 🚀
-            </div>
+          {savedNotes.length === 0 ? (
+            <p style={{ opacity: 0.6 }}>No saved doubts yet</p>
           ) : (
-            answers.map((item) => (
-              <div key={item.id} style={styles.answerCard}>
-                <div style={styles.answerTop}>
-                  <span style={styles.badge}>Solved</span>
-                  <span style={styles.time}>{item.time}</span>
+            savedNotes.map((item) => (
+              <div
+                key={item.id}
+                style={styles.savedItem}
+              >
+                <div
+                  style={{ fontWeight: 700, cursor: "pointer" }}
+                  onClick={() => setSelectedSaved(item)}
+                >
+                  {(item.q || "No question").slice(0, 40)}...
                 </div>
 
-                <div style={styles.question}>
-                  <strong>❓ Question:</strong> {item.q}
-                </div>
-
-                <div style={styles.answer}>
-                  <strong>🧠 Answer:</strong>
-                  <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-                    {item.a}
-                  </div>
-                </div>
-
-                <div style={styles.btnRow}>
-                  <button
-                    style={styles.smallBtn}
-                    onClick={() => copyAnswer(item.a)}
-                  >
-                    📋 Copy
-                  </button>
-
-                  <button
-                    style={styles.smallBtn}
-                    onClick={() => askAgain(item.q)}
-                  >
-                    🔁 Ask Again
-                  </button>
-
-                  <button
-                    style={styles.smallBtn}
-                    onClick={() => saveAnswer(item)}
-                  >
-                    💾 Save
-                  </button>
-                </div>
+                <button
+                  style={styles.deleteMini}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteSaved(item.id);
+                  }}
+                >
+                  ❌
+                </button>
               </div>
             ))
           )}
         </div>
+
+        {/* MAIN AREA */}
+        <div style={styles.main}>
+
+          {/* HEADER */}
+          <div style={styles.header}>
+            <h1 style={styles.title}>👑 AI Doubt Resolver</h1>
+            <p style={styles.subtitle}>
+              Premium instant teacher for Maths, Science, English & more
+            </p>
+          </div>
+
+          {selectedSaved && (
+  <div style={styles.card}>
+    <h3 style={{ color: "#facc15" }}>📌 Saved Question</h3>
+
+    <div style={styles.question}>
+      <strong>❓ Question:</strong> {selectedSaved.q}
+    </div>
+
+    <div style={styles.answer}>
+      <strong>🧠 Answer:</strong>
+      <div style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>
+        {selectedSaved.a}
       </div>
     </div>
-  );
+
+    <button
+      style={styles.smallBtn}
+      onClick={() => setSelectedSaved(null)}
+    >
+      ❌ Close
+    </button>
+  </div>
+)}
+
+          {/* INPUT CARD */}
+          <div style={styles.card}>
+
+            {/* DROP ZONE */}
+            <div
+              style={{
+                ...styles.dropZone,
+                borderColor: dragOver ? "#facc15" : "#3f3f46",
+                background: dragOver ? "#2a2208" : "#161616",
+              }}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current.click()}
+            >
+              <input
+                type="file"
+                hidden
+                ref={fileInputRef}
+                onChange={handleSelectFile}
+              />
+
+              {fileName ? (
+                <div>
+                  <div style={styles.fileOk}>📄 {fileName}</div>
+                  <div style={styles.fileSub}>Tap to change file</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={styles.fileMain}>📎 Upload or Drop File</div>
+                  <div style={styles.fileSub}>
+                    Notes / Worksheet / Question Paper
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* QUESTION */}
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Type your doubt here..."
+              style={styles.textarea}
+            />
+
+            <button
+              onClick={handleAsk}
+              disabled={loading}
+              style={{
+                ...styles.mainBtn,
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? "🤖 Solving..." : "✨ Solve My Doubt"}
+            </button>
+
+          </div>
+
+          {/* ANSWERS */}
+          <div style={styles.answerWrap}>
+            {answers.length === 0 ? (
+              <div style={styles.empty}>
+                Your solved doubts will appear here 🚀
+              </div>
+            ) : (
+              answers.map((item) => (
+                <div key={item.id} style={styles.answerCard}>
+
+                  {/* TOP */}
+                  <div style={styles.answerTop}>
+                    <span style={styles.badge}>Solved</span>
+                    <span style={styles.time}>{item.time}</span>
+                  </div>
+
+                  {/* QUESTION */}
+                  <div style={styles.question}>
+                    <strong>❓ Question:</strong> {item.q}
+                  </div>
+
+                  {/* ANSWER */}
+                  <div style={styles.answer}>
+                    <strong>🧠 Answer:</strong>
+                    <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
+                      {item.a}
+                    </div>
+                  </div>
+
+                  {/* ACTIONS */}
+                  <div style={styles.btnRow}>
+
+                    <button
+                      style={styles.smallBtn}
+                      onClick={() => copyAnswer(item.a)}
+                    >
+                      📋 Copy
+                    </button>
+
+                    <button
+                      style={styles.smallBtn}
+                      onClick={() => askAgain(item.q)}
+                    >
+                      🔁 Ask Again
+                    </button>
+
+                    <button
+                      style={styles.smallBtn}
+                      onClick={() => saveAnswer(item)}
+                    >
+                      💾 Save
+                    </button>
+
+                      {/* NEW DELETE BUTTON */}
+  <button
+    style={{
+      ...styles.smallBtn,
+      border: "1px solid red",
+      color: "red",
+    }}
+    onClick={() =>
+      setAnswers((prev) => prev.filter((x) => x.id !== item.id))
+    }
+  >
+    🗑️ Delete
+  </button>
+
+                  </div>
+
+                </div>
+              ))
+            )}
+          </div>
+
+        </div> {/* MAIN END */}
+
+      </div> {/* LAYOUT END */}
+
+    </div> {/* CONTAINER END */}
+
+  </div>
+);
 }
 
 /* ================= STYLES ================= */
@@ -465,7 +579,7 @@ const styles = {
   btnRow: {
     marginTop: 16,
     display: "grid",
-    gridTemplateColumns: "repeat(3,1fr)",
+    gridTemplateColumns: "repeat(4,1fr)",
     gap: 10,
   },
 
@@ -491,4 +605,40 @@ const styles = {
     zIndex: 999,
     fontWeight: 700,
   },
+  layout: {
+  display: "flex",
+  gap: 20,
+},
+
+sidebar: {
+  width: 260,
+  background: "rgba(255,255,255,0.03)",
+  border: "1px solid rgba(250,204,21,0.2)",
+  borderRadius: 16,
+  padding: 14,
+  height: "80vh",
+  overflowY: "auto",
+  position: "sticky",
+  top: 20,
+},
+
+main: {
+  flex: 1,
+},
+
+savedItem: {
+  padding: 10,
+  borderBottom: "1px solid #333",
+  cursor: "pointer",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+
+deleteMini: {
+  background: "transparent",
+  border: "none",
+  color: "red",
+  cursor: "pointer",
+},
 };

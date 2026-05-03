@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "../../../utils/api.js";
 import { BrainCore } from "@/utils/memoryEngine";
 
@@ -38,10 +38,12 @@ export default function StudyPlanner() {
       { from: "21:00", to: "22:30" },
     ],
   });
-
+const [savedPlans, setSavedPlans] = useState([]);
+const [selectedPlan, setSelectedPlan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState([]);
   const [error, setError] = useState("");
+
 
   /* ================= UPDATE ================= */
   const update = (key, value) => {
@@ -208,6 +210,40 @@ export default function StudyPlanner() {
     return finalPlan;
   };
 
+  useEffect(() => {
+  const data = localStorage.getItem("study_plans");
+  if (data) {
+    setSavedPlans(JSON.parse(data));
+  }
+}, []);
+
+/* ================= SAVE PLAN ================= */
+const savePlan = () => {
+  const newPlan = {
+    id: Date.now(),
+    subject: form.subjects,
+    weakSubject: form.weakSubject,
+    mode: form.mode,
+    goal: form.goal,
+    plan: plan,
+    time: new Date().toLocaleString(),
+  };
+
+  const old = JSON.parse(localStorage.getItem("study_plans") || "[]");
+  const updated = [newPlan, ...old];
+
+  localStorage.setItem("study_plans", JSON.stringify(updated));
+  setSavedPlans(updated);
+};
+
+/* ================= DELETE PLAN ================= */
+const deletePlan = (id) => {
+  const old = JSON.parse(localStorage.getItem("study_plans") || "[]");
+  const updated = old.filter((p) => p.id !== id);
+
+  localStorage.setItem("study_plans", JSON.stringify(updated));
+  setSavedPlans(updated);
+};
   /* ================= GENERATE ================= */
   const generatePlan = async () => {
     setLoading(true);
@@ -278,186 +314,337 @@ Format:
 });
 
 
+
+
     setLoading(false);
   };
 
   /* ================= UI ================= */
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>📘 EMPIROX Study Planner</h1>
-        <p style={styles.sub}>
-          Realistic AI planner based on energy, goals & study psychology
-        </p>
+  <div style={styles.page}>
+    
+    {/* HEADER */}
+    <div style={styles.header}>
+      <h1 style={styles.title}>📘 EMPIROX Study Brain</h1>
+      <p style={styles.sub}>
+        AI-powered adaptive learning planner with memory system
+      </p>
+    </div>
+
+    {/* MAIN GRID */}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "280px 420px 1fr",
+        gap: 20,
+      }}
+    >
+
+      {/* ================= SIDEBAR (BRAIN MEMORY) ================= */}
+      <div style={styles.card}>
+        <h3 style={{ color: "#D4AF37", marginBottom: 10 }}>
+          🧠 Memory Vault
+        </h3>
+
+        {savedPlans.length === 0 ? (
+          <p style={{ opacity: 0.6 }}>No saved plans yet</p>
+        ) : (
+          savedPlans.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                padding: 12,
+                marginBottom: 10,
+                borderRadius: 10,
+                border: "1px solid rgba(212,175,55,0.2)",
+                cursor: "pointer",
+                background:
+                  selectedPlan?.id === p.id
+                    ? "rgba(212,175,55,0.08)"
+                    : "transparent",
+              }}
+              onClick={() => setSelectedPlan(p)}
+            >
+              <div style={{ fontWeight: "bold", color: "#fff" }}>
+                🎯 {p.goal}
+              </div>
+
+              <div style={{ fontSize: 12, opacity: 0.6 }}>
+                {p.time}
+              </div>
+
+              <button
+                style={{
+                  marginTop: 6,
+                  background: "transparent",
+                  border: "none",
+                  color: "#ff4d4d",
+                  cursor: "pointer",
+                  fontSize: 12,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deletePlan(p.id);
+                }}
+              >
+                🗑 Delete
+              </button>
+            </div>
+          ))
+        )}
       </div>
 
-      <div style={styles.grid}>
-        {/* LEFT */}
-        <div style={styles.card}>
-          <h3 style={styles.section}>🎯 Planner Setup</h3>
+      {/* ================= BUILDER PANEL ================= */}
+      <div style={styles.card}>
+        <h3 style={styles.section}>🎯 Planner Core</h3>
 
-          <label style={styles.label}>Class</label>
+        <label style={styles.label}>Class</label>
+        <input
+          style={styles.input}
+          value={form.standard}
+          onChange={(e) => update("standard", e.target.value)}
+        />
+
+        <label style={styles.label}>Goal</label>
+        <select
+          style={styles.input}
+          value={form.goal}
+          onChange={(e) => update("goal", e.target.value)}
+        >
+          <option>Upcoming Exam</option>
+          <option>Daily Revision</option>
+          <option>Deep Learning</option>
+        </select>
+
+        <label style={styles.label}>Mode</label>
+        <select
+          style={styles.input}
+          value={form.mode}
+          onChange={(e) => update("mode", e.target.value)}
+        >
+          <option>Balanced</option>
+          <option>Intense</option>
+          <option>Light</option>
+        </select>
+
+        <label style={styles.label}>Subjects</label>
+
+        <div style={styles.row}>
           <input
             style={styles.input}
-            value={form.standard}
-            onChange={(e) => update("standard", e.target.value)}
+            value={form.customSubject}
+            onChange={(e) => update("customSubject", e.target.value)}
+            placeholder="Add subject"
           />
+          <button style={styles.smallBtn} onClick={addSubject}>
+            +
+          </button>
+        </div>
 
-          <label style={styles.label}>Goal</label>
-          <select
-            style={styles.input}
-            value={form.goal}
-            onChange={(e) => update("goal", e.target.value)}
-          >
-            <option>Upcoming Exam</option>
-            <option>Daily Revision</option>
-            <option>Deep Learning</option>
-          </select>
-
-          <label style={styles.label}>Mode</label>
-          <select
-            style={styles.input}
-            value={form.mode}
-            onChange={(e) => update("mode", e.target.value)}
-          >
-            <option>Balanced</option>
-            <option>Intense</option>
-            <option>Light</option>
-          </select>
-
-          <label style={styles.label}>Add Subject</label>
-          <div style={styles.row}>
-            <input
-              style={styles.input}
-              placeholder="Physics"
-              value={form.customSubject}
-              onChange={(e) => update("customSubject", e.target.value)}
-            />
-            <button style={styles.smallBtn} onClick={addSubject}>
-              +
-            </button>
-          </div>
-
-          <div style={styles.tags}>
-            {form.subjects.map((s) => (
-              <span key={s} style={styles.tag}>
-                {s}
-                <button
-                  style={styles.remove}
-                  onClick={() => removeSubject(s)}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-
-          <label style={styles.label}>Weak Subject</label>
-          <select
-            style={styles.input}
-            value={form.weakSubject}
-            onChange={(e) => update("weakSubject", e.target.value)}
-          >
-            {form.subjects.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-
-          <label style={styles.label}>Exam In Days</label>
-          <input
-            style={styles.input}
-            value={form.examDays}
-            onChange={(e) => update("examDays", e.target.value)}
-          />
-
-          <label style={styles.label}>Study Time Blocks</label>
-
-          {form.slots.map((slot, i) => (
-            <div style={styles.row} key={i}>
-              <input
-                type="time"
-                style={styles.input}
-                value={slot.from}
-                onChange={(e) =>
-                  updateSlot(i, "from", e.target.value)
-                }
-              />
-              <input
-                type="time"
-                style={styles.input}
-                value={slot.to}
-                onChange={(e) =>
-                  updateSlot(i, "to", e.target.value)
-                }
-              />
+        <div style={styles.tags}>
+          {form.subjects.map((s) => (
+            <span key={s} style={styles.tag}>
+              {s}
               <button
-                style={styles.redBtn}
-                onClick={() => removeSlot(i)}
+                style={styles.remove}
+                onClick={() => removeSubject(s)}
               >
                 ×
               </button>
-            </div>
+            </span>
           ))}
+        </div>
 
-          <button style={styles.smallAdd} onClick={addSlot}>
-            + Add Time Block
-          </button>
+        <label style={styles.label}>Weak Subject</label>
+        <select
+          style={styles.input}
+          value={form.weakSubject}
+          onChange={(e) => update("weakSubject", e.target.value)}
+        >
+          {form.subjects.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
 
+        <label style={styles.label}>Exam Days</label>
+        <input
+          style={styles.input}
+          value={form.examDays}
+          onChange={(e) => update("examDays", e.target.value)}
+        />
+        {/* ================= TIME BLOCK SECTION ================= */}
+<label style={styles.label}>⏰ Time Blocks</label>
+
+<div style={{ marginTop: 10 }}>
+
+  {form.slots.map((slot, index) => (
+    <div
+      key={index}
+      style={{
+        display: "flex",
+        gap: 10,
+        alignItems: "center",
+        marginBottom: 10,
+        padding: 10,
+        borderRadius: 10,
+        border: "1px solid rgba(255, 215, 0, 0.15)",
+      }}
+    >
+      {/* FROM TIME */}
+      <input
+        type="time"
+        value={slot.from}
+        onChange={(e) => updateSlot(index, "from", e.target.value)}
+        style={styles.input}
+      />
+
+      <span style={{ color: "#D4AF37" }}>→</span>
+
+      {/* TO TIME */}
+      <input
+        type="time"
+        value={slot.to}
+        onChange={(e) => updateSlot(index, "to", e.target.value)}
+        style={styles.input}
+      />
+
+      {/* REMOVE BUTTON */}
+      <button
+        style={styles.redBtn}
+        onClick={() => removeSlot(index)}
+      >
+        ✕
+      </button>
+    </div>
+  ))}
+
+  {/* ADD SLOT BUTTON */}
+  <button
+    style={styles.smallAdd}
+    onClick={addSlot}
+  >
+    ➕ Add Time Block
+  </button>
+</div>
+
+        <button
+          style={styles.mainBtn}
+          onClick={generatePlan}
+          disabled={loading}
+        >
+          {loading ? "🤖 Thinking..." : "✨ Generate Plan"}
+        </button>
+
+        {/* SAVE BUTTON (FIXED - NO NESTING BUG) */}
+        {plan.length > 0 && (
           <button
-            style={styles.mainBtn}
-            onClick={generatePlan}
-            disabled={loading}
+            style={{ ...styles.smallAdd, marginTop: 10 }}
+            onClick={savePlan}
           >
-            {loading ? "🤖 Creating..." : "✨ Generate Plan"}
+            💾 Save Plan
           </button>
+        )}
 
-          {error && <p style={styles.error}>{error}</p>}
-        </div>
+        {error && <p style={styles.error}>{error}</p>}
+      </div>
 
-        {/* RIGHT */}
-        <div style={styles.card}>
-          <h3 style={styles.section}>📅 Smart Schedule</h3>
+      {/* ================= VIEWER PANEL ================= */}
+      <div style={styles.card}>
+        <h3 style={styles.section}>📅 AI Schedule Brain</h3>
 
-          {loading ? (
-            <div style={styles.empty}>Generating productive plan...</div>
-          ) : plan.length === 0 ? (
-            <div style={styles.empty}>
-              Your study schedule will appear here.
-            </div>
-          ) : (
-            <div style={styles.timeline}>
-              {plan.map((item, i) => (
-                <div
-                  key={i}
-                  style={{
-                    ...styles.block,
-                    borderLeft:
-                      item.subject === "Break"
-                        ? "4px solid #22c55e"
-                        : "4px solid #facc15",
-                  }}
-                >
-                  <div style={styles.time}>
-                    {item.start} - {item.end}
-                  </div>
+        {/* SELECTED PLAN VIEW */}
+        {selectedPlan && (
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ color: "#D4AF37" }}>📖 Selected Memory</h3>
 
-                  <div style={styles.subject}>
-                    {item.subject}
-                  </div>
+           <div style={{ marginTop: 10 }}>
+  <h2 style={{ color: "#D4AF37" }}>📅 Full Study Plan</h2>
 
-                  <div style={styles.task}>{item.task}</div>
+  <p><b>Goal:</b> {selectedPlan.goal}</p>
+  <p><b>Mode:</b> {selectedPlan.mode}</p>
+  <p><b>Weak Subject:</b> {selectedPlan.weakSubject}</p>
+  <p><b>Saved:</b> {selectedPlan.time}</p>
 
-                  <div style={styles.method}>
-                    {item.method}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+  <hr style={{ margin: "10px 0", opacity: 0.2 }} />
+
+  {selectedPlan.plan?.map((item, i) => (
+    <div
+      key={i}
+      style={{
+        padding: 10,
+        marginBottom: 8,
+        borderRadius: 10,
+        border: "1px solid rgba(212,175,55,0.15)",
+        background:
+          item.subject === "Break"
+            ? "rgba(34,197,94,0.08)"
+            : "rgba(212,175,55,0.05)",
+      }}
+    >
+      <div style={{ fontSize: 12, opacity: 0.7 }}>
+        ⏰ {item.start} - {item.end}
+      </div>
+
+      <div style={{ fontWeight: "bold", color: "#D4AF37" }}>
+        📘 {item.subject}
+      </div>
+
+      <div>{item.task}</div>
+
+      <div style={{ fontSize: 11, opacity: 0.6 }}>
+        {item.method}
       </div>
     </div>
-  );
+  ))}
+</div>
+
+            <button
+              style={styles.smallAdd}
+              onClick={() => setSelectedPlan(null)}
+            >
+              Close
+            </button>
+          </div>
+        )}
+
+        {/* PLAN DISPLAY */}
+        {loading ? (
+          <div style={styles.empty}>Generating smart plan...</div>
+        ) : plan.length === 0 ? (
+          <div style={styles.empty}>
+            Your AI study brain output will appear here 🧠
+          </div>
+        ) : (
+          <div style={styles.timeline}>
+            {plan.map((item, i) => (
+              <div
+                key={i}
+                style={{
+                  ...styles.block,
+                  borderLeft:
+                    item.subject === "Break"
+                      ? "4px solid #22c55e"
+                      : "4px solid #facc15",
+                }}
+              >
+                <div style={styles.time}>
+                  {item.start} - {item.end}
+                </div>
+
+                <div style={styles.subject}>{item.subject}</div>
+
+                <div style={styles.task}>{item.task}</div>
+
+                <div style={styles.method}>{item.method}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
+  </div>
+);
 }
 
 /* ================= STYLES ================= */

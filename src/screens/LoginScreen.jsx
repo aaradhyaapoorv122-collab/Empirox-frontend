@@ -15,6 +15,8 @@ export default function AuthScreen() {
   const { user, setUser } =
     useContext(AuthContext);
 
+    const [resetLoading, setResetLoading] = useState(false);
+
   const [mode, setMode] =
     useState("login");
 
@@ -100,83 +102,63 @@ export default function AuthScreen() {
   /* ===================================
      PROFILE CREATOR
   =================================== */
-  async function ensureProfile(
-    authUser
-  ) {
-    if (!authUser)
-      return;
+  async function ensureProfile(authUser) {
+  if (!authUser) return;
 
-    const today =
-      new Date()
-        .toISOString()
-        .split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
 
-    const fullName =
-      authUser
-        ?.user_metadata
-        ?.full_name ||
-      authUser
-        ?.user_metadata
-        ?.name ||
-      authUser
-        ?.user_metadata
-        ?.given_name ||
-      name ||
-      authUser.email?.split(
-        "@"
-      )[0] ||
-      "User";
+  // check existing profile
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", authUser.id)
+    .single();
 
-    const payload = {
-      id: authUser.id,
-      email:
-        authUser.email,
+  const metaName =
+    authUser?.user_metadata?.full_name ||
+    authUser?.user_metadata?.name ||
+    authUser?.user_metadata?.given_name ||
+    name ||
+    authUser.email?.split("@")[0] ||
+    "User";
 
-      name: fullName,
+  const metaStandard =
+    authUser?.user_metadata?.standard ||
+    standard ||
+    "1";
 
-      standard:
-        authUser
-          ?.user_metadata
-          ?.standard ||
-        standard ||
-        "1",
+  const payload = {
+    id: authUser.id,
+    email: authUser.email,
 
-      country:
-        detectCountry(),
+    // preserve old values if already saved
+    name: existing?.name || metaName,
+    standard: existing?.standard || metaStandard,
 
-      tier_plan:
-        "free",
+    country: existing?.country || detectCountry(),
+    tier_plan: existing?.tier_plan || "free",
+    role: existing?.role || "student",
 
-      role: "student",
+    current_streak: existing?.current_streak || 1,
+    strictness_score: existing?.strictness_score || 10,
 
-      current_streak: 1,
+    last_active_date:
+      existing?.last_active_date || today,
 
-      strictness_score: 10,
+    updated_at: new Date().toISOString(),
+  };
 
-      last_active_date:
-        today,
+  await supabase
+    .from("profiles")
+    .upsert(payload, {
+      onConflict: "id",
+    });
 
-      updated_at:
-        new Date().toISOString(),
-    };
-
-    await supabase
-      .from("profiles")
-      .upsert(
-        payload,
-        {
-          onConflict:
-            "id",
-        }
-      );
-
-    localStorage.setItem(
-      "empirox_profile",
-      JSON.stringify(
-        payload
-      )
-    );
-  }
+  localStorage.setItem(
+    "empirox_profile",
+    JSON.stringify(payload)
+  );
+}
 
   /* ===================================
      REAL STREAK UPDATE
@@ -369,44 +351,84 @@ export default function AuthScreen() {
     return "";
   }
 
-  /* ===================================
-     LOGIN / SIGNUP
-  =================================== */
-  async function handleSubmit() {
-    const now =
-      Date.now();
+/* ===================================
+   FORGOT PASSWORD
+=================================== */
+async function handleForgotPassword() {
+  if (!email) {
+    setError("Enter your email first.");
+    return;
+  }
 
-    if (
-      lockRef.current ||
-      now -
-        lastClickRef.current <
-        1200
-    )
-      return;
-
-    lockRef.current =
-      true;
-
-    lastClickRef.current =
-      now;
-
-    setLoading(
-      true
-    );
-
+  try {
+    setResetLoading(true);
     setError("");
     setSuccess("");
 
-    try {
-      const msg =
-        validate();
+    const { error } =
+      await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        {
+          redirectTo:
+           window.location.origin + "/empicraft/reset-password"
+        }
+      );
 
-      if (msg)
-        throw new Error(
-          msg
-        );
+    if (error) throw error;
 
-      /* LOGIN */
+    setSuccess(
+      `🔑 Password reset link sent to ${email}. Check Inbox / Spam.`
+    );
+
+    // 30 second cooldown
+    setTimeout(() => {
+      setResetLoading(false);
+    }, 30000);
+
+  } catch (err) {
+    if (
+      err.message &&
+      err.message
+        .toLowerCase()
+        .includes("rate limit")
+    ) {
+      setError(
+        "Too many requests. Please wait a few minutes and try again."
+      );
+    } else {
+      setError(
+        err.message ||
+        "Failed to send reset email."
+      );
+    }
+
+    setResetLoading(false);
+  }
+}
+/* ===================================
+   LOGIN / SIGNUP
+=================================== */
+async function handleSubmit() {
+  const now = Date.now();
+
+  if (
+    lockRef.current ||
+    now - lastClickRef.current < 1200
+  )
+    return;
+
+  lockRef.current = true;
+  lastClickRef.current = now;
+
+  setLoading(true);
+  setError("");
+  setSuccess("");
+
+  try {
+    const msg = validate();
+
+    if (msg) throw new Error(msg);
+
       if (
         mode ===
         "login"
@@ -434,13 +456,9 @@ export default function AuthScreen() {
           data.user
         );
 
-        setUser(
-          data.user
-        );
-
-        navigate(
-          "/tier-selector"
-        );
+       setUser(
+  data.user
+);
       }
 
       /* SIGNUP */
@@ -473,8 +491,10 @@ export default function AuthScreen() {
           !data.session
         ) {
           setSuccess(
-            "Account created. Verify email first."
-          );
+            
+`🎉 Account created! Verification link sent to ${email}. Please check Inbox / Spam, click verify, then login.`
+
+         );
           return;
         }
 
@@ -487,27 +507,29 @@ export default function AuthScreen() {
         );
 
         setUser(
-          data.user
-        );
-
-        navigate(
-          "/tier-selector"
-        );
+  data.user
+);
       }
-    } catch (err) {
-      setError(
-        err.message ||
-          "Failed."
-      );
-    } finally {
-      setLoading(
-        false
-      );
-
-      lockRef.current =
-        false;
-    }
+   
+  } catch (err) {
+  if (
+    err.message &&
+    err.message
+      .toLowerCase()
+      .includes(
+        "invalid login credentials"
+      )
+  ) {
+    setError(
+      "Incorrect email or password. Please try again or use Forgot Password."
+    );
+  } else {
+    setError(
+      err.message || "Failed."
+    );
   }
+}
+}
 
   /* ===================================
      GOOGLE LOGIN
@@ -688,6 +710,19 @@ const handleGoogle = async () => {
           </div>
         )}
 
+        <div
+  style={styles.forgot}
+  onClick={
+    !resetLoading
+      ? handleForgotPassword
+      : null
+  }
+>
+  {resetLoading
+    ? "Please wait..."
+    : "Forgot Password?"}
+</div>
+
         <button
           style={
             styles.button
@@ -802,6 +837,15 @@ const styles = {
     color:
       "white",
   },
+
+  forgot: {
+  marginTop: 8,
+  textAlign: "right",
+  fontSize: 13,
+  color: "#d4af37",
+  cursor: "pointer",
+  fontWeight: 600,
+},
 
   eye: {
     position:

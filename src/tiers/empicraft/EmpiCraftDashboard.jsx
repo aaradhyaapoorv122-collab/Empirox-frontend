@@ -137,7 +137,7 @@ export default function EmpiCraftDashboard() {
             );
 
           end.setDate(
-            end.getDate() + 90
+            end.getDate() + 21
           );
 
           const diff =
@@ -273,7 +273,6 @@ export default function EmpiCraftDashboard() {
 
   const premiumFeatures = [
     ...trialFeatures,
-    "Skill Hub",
     "Career Detector",
     "Project Builder",
   ];
@@ -392,16 +391,7 @@ export default function EmpiCraftDashboard() {
       "Study Companion",
       "/empicraft/study-companion",
     ],
-    [
-      "✍️",
-      "Blog Builder",
-      "/empicraft/blog-builder",
-    ],
-    [
-      "🧪",
-      "Skill Hub",
-      "/empicraft/Skill-Hub",
-    ],
+   
     [
       "📈",
       "Career Detector",

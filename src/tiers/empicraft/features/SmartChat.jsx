@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { AuthContext } from "../../../context/AuthContext";
-import api from "../../../utils/api.js";
-import { aiRequest } from "@/utils/aiRequest";
 import { supabase } from "@/lib/supabaseClient";
-import { BrainCore } from "@/utils/memoryEngine";
 
 const MAX_FILES = 6;
 
@@ -14,352 +11,579 @@ export default function SmartChat() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [chatSessions, setChatSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
 
-  const inputRef = useRef(null);
-  const fileRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const fileRef = useRef(null);
   const sessionStartTime = useRef(Date.now());
+  const sessionId = useRef(crypto.randomUUID());
+  const [debug, setDebug] = useState(null);
 
-  /* ================= AUTO SCROLL ================= */
+  /* ================= SCROLL ================= */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  /* ================= SESSION TIMER ================= */
-  function formatSessionTime() {
+  /* ================= TIMER ================= */
+  const formatSessionTime = () => {
     const s = Math.floor((Date.now() - sessionStartTime.current) / 1000);
     return `${Math.floor(s / 60)}m ${s % 60}s`;
-  }
+  };
 
-  /* ================= FILE HANDLER ================= */
-  function handleFileSelect(e) {
-    const files = Array.from(e.target.files);
+  /* ================= SAFE DATE ================= */
+  const safeDate = (d) => {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return new Date();
+    return date;
+  };
+
+  /* ================= LOAD CHATS ================= */
+ useEffect(() => {
+  if (!user?.id) return;
+
+  const loadChats = async () => {
+    const { data, error } = await supabase
+      .from("feature_history")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("feature_name", "smart_chat")
+      .eq("deleted", false)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.log("Load error:", error.message);
+      return;
+    }
+
+    const cleaned = (data || []).map((item) => ({
+      ...item,
+      created_at: safeDate(item.created_at).toISOString(),
+    }));
+
+    setChatSessions(cleaned);
+  };
+
+  loadChats();
+}, [user]);
+
+useEffect(() => {
+  if (!user?.id) return;
+  if (!activeSessionId) return;
+  if (messages.length === 0) return;
+
+  const timeout = setTimeout(async () => {
+    try {
+     await supabase.from("feature_history").upsert({
+  id: activeSessionId,
+  user_id: user.id,
+  feature_name: "smart_chat",
+
+  title:
+    messages.find((m) => m.type === "question")
+      ?.text?.slice(0, 30) || "New Chat",
+
+  content: {
+    messages: messages,
+  },
+
+  deleted: false,
+  created_at: new Date().toISOString(),
+},
+{
+  onConflict: "id"
+
+      });
+    } catch (err) {
+      console.log("Save error:", err.message);
+    }
+  }, 800); // faster + smoother like ChatGPT
+
+  return () => clearTimeout(timeout);
+}, [messages, user, activeSessionId]);
+
+  /* ================= LOAD CHAT ================= */
+  const loadChat = (chat) => {
+    setActiveSessionId(chat.id);
+
+    const safeMessages = chat.content?.messages || [];
+
+    setMessages(
+      safeMessages.map((m) => ({
+        ...m,
+        time: safeDate(m.time || chat.created_at).toISOString(),
+      }))
+    );
+  };
+
+  /* ================= NEW CHAT ================= */
+ const startNewChat = async () => {
+  const id = crypto.randomUUID();
+
+  setActiveSessionId(id);
+  sessionId.current = id;
+
+  setMessages([]);
+  setInput("");
+  setUploadedFiles([]);
+
+  // IMPORTANT: create DB record immediately
+  await supabase.from("feature_history").insert({
+    id,
+    user_id: user?.id,
+    feature_name: "smart_chat",
+    title: "New Chat",
+    content: { messages: [] },
+    deleted: false,
+    created_at: new Date().toISOString(),
+  });
+};
+  /* ================= DELETE CHAT ================= */
+  const deleteChat = async (id) => {
+    await supabase
+      .from("feature_history")
+      .update({
+        deleted: true,
+        deleted_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    setChatSessions((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  /* ================= FILE ================= */
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+
     if (uploadedFiles.length + files.length > MAX_FILES) return;
 
-    setUploadedFiles((prev) => [...prev, ...files]);
+    setUploadedFiles((p) => [...p, ...files]);
 
+    setMessages((p) => [
+      ...p,
+      {
+        type: "system",
+        text: `📎 ${files.length} file(s) uploaded`,
+        time: new Date().toISOString(),
+      },
+    ]);
+  };
+
+  /* ================= SEND ================= */
+  const handleSend = async () => {
+  if (!input.trim()) return;
+
+  const question = input.trim();
+
+  const newMessages = [
+    ...messages,
+    {
+      type: "question",
+      text: question,
+      time: new Date().toISOString(),
+    },
+  ];
+
+  setMessages(newMessages);
+  setInput("");
+  setLoading(true);
+
+  try {
+    const history = newMessages
+      .filter((m) => m.type === "question" || m.type === "answer")
+      .slice(-12)
+      .map((m) => ({
+        role: m.type === "question" ? "user" : "assistant",
+        content: m.text,
+      }));
+
+    const res = await fetch("http://localhost:5000/ai/core", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: question,
+        history,
+        feature: "smart_chat",
+      }),
+    });
+
+    const data = await res.json();
+
+    setDebug(data?.debug); // ✅ IMPORTANT
+
+   const finalReply = data?.reply || "⚠️ No response";
+
+const links = data?.links || [];
+    setMessages((prev) => [
+  ...prev,
+  {
+    type: "answer",
+    text: finalReply,
+    links: links,
+    time: new Date().toISOString(),
+  },
+]);
+  
+
+  } catch (err) {
     setMessages((prev) => [
       ...prev,
-      { type: "system", text: `📎 ${files.length} file(s) uploaded` },
+      {
+        type: "answer",
+        text: "⚠️ Something went wrong",
+        time: new Date().toISOString(),
+      },
     ]);
   }
 
-  /* ================= AI CALL ================= */
-  async function handleSend() {
-    if (!input.trim()) return;
 
-    const question = input.trim();
 
-    setMessages((prev) => [...prev, { type: "question", text: question }]);
-    setInput("");
-    setLoading(true);
-
-    try {
-      const history = [...messages, { type: "question", text: question }]
-        .filter((m) => m.type === "question" || m.type === "answer")
-        .map((m) => ({
-          role: m.type === "question" ? "user" : "assistant",
-          content: m.text,
-        }));
-
-      const reply = await api.sendAIMessage({
-        message: question,
-        feature: "smart_chat_v3",
-        standard: "8",
-        context:
-          "Empirox Smart Chat v3 — use updated knowledge and reasoning",
-        history,
-      });
-
-      const finalReply =
-        typeof reply === "string"
-          ? reply
-          : reply?.reply || JSON.stringify(reply);
-
-      setMessages((prev) => [
-        ...prev,
-        { type: "answer", text: finalReply },
-      ]);
-
-      /* ================= BRAINC CORE MEMORY ================= */
-      if (user?.id) {
-        await BrainCore.log(user.id, "smart_chat_v3", {
-          question,
-          answer: finalReply,
-          sessionTime: formatSessionTime(),
-          fileCount: uploadedFiles.length,
-        });
-      }
-
-    } catch (err) {
-      console.log(err);
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          type: "answer",
-          text: "⚠️ AI error occurred. Try again.",
-        },
-      ]);
-    }
-
-    setLoading(false);
-  }
-
-  /* ================= AI WRAPPER (optional fallback layer) ================= */
-  const handleAskAI = async (msg) => {
-    return await aiRequest(msg, async (m) => {
-      return await fetch("http://localhost:5000/ai/core", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: m }),
-      }).then((r) => r.json());
-    });
-  };
-
+  setLoading(false);
+};
   /* ================= UI ================= */
-  return (
-    <div style={styles.page}>
+ return (
+  <div style={styles.container}>
+    
+    {/* SIDEBAR */}
+    <div style={styles.sidebar}>
+      <div style={styles.brand}>🧠 Smart Chat</div>
 
-      {/* HEADER */}
-      <div style={styles.header}>
-        <div>
-          <h2>🧠 Empirox Smart Chat v3</h2>
-          <span style={styles.status}>🟢 AI Active Mode</span>
-        </div>
-        <div style={styles.session}>
-          ⏱ {formatSessionTime()}
+      <button style={styles.newBtn} onClick={startNewChat}>
+        + New Chat
+      </button>
+
+      <div style={styles.chatList}>
+        {chatSessions.map((c) => (
+          <div
+            key={c.id}
+            style={styles.chatItem}
+          >
+            <div onClick={() => loadChat(c)} style={{ flex: 1 }}>
+              💬 {c.title}
+            </div>
+            <button onClick={() => deleteChat(c.id)} style={styles.delBtn}>
+              🗑
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* MAIN CHAT AREA */}
+    <div style={styles.chatArea}>
+      
+      {/* TOP BAR (GLASS STYLE FEEL) */}
+      <div style={styles.topBar}>
+        <div style={{ fontWeight: 600 }}>Smart Chat AI</div>
+
+        {debug?.realtimeMode && (
+          <div style={{ color: "#00ff88", fontSize: 12 }}>
+            ⚡ Real-time mode ON
+          </div>
+        )}
+
+        <div style={{ color: "#D4AF37", fontSize: 13 }}>
+          {formatSessionTime()}
         </div>
       </div>
 
-      {/* CHAT BOX */}
+      {/* CHAT MESSAGES */}
       <div style={styles.chatBox}>
         {messages.map((m, i) => (
           <div
             key={i}
             style={{
               display: "flex",
-              justifyContent:
-                m.type === "question"
-                  ? "flex-end"
-                  : "flex-start",
+              flexDirection: "column",
+              alignItems:
+                m.type === "question" ? "flex-end" : "flex-start",
+              marginBottom: 18,
             }}
           >
-            <div
-              style={
-                m.type === "question"
-                  ? styles.userBubble
-                  : m.type === "system"
-                  ? styles.systemBubble
-                  : styles.aiBubble
-              }
-            >
-              {m.text}
-            </div>
+
+            {/* USER MESSAGE */}
+            {m.type === "question" && (
+              <div style={styles.userMsg}>
+                {m.text}
+              </div>
+            )}
+
+            {/* AI MESSAGE */}
+            {m.type === "answer" && (
+              <div style={styles.aiMsg}>
+                {m.text}
+
+                {/* LINKS AS CARDS */}
+                {m.links && m.links.length > 0 && (
+                  <div style={styles.linkBox}>
+                    {m.links.map((l, idx) => (
+                      <a
+                        key={idx}
+                        href={l.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={styles.linkCard}
+                      >
+                        🔗 {l.title}
+                        <span style={{ opacity: 0.6 }}>→</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         ))}
 
+        {/* LOADING STATE */}
         {loading && (
-          <div style={styles.typing}>
-            <span style={styles.dot}></span>
-            <span style={styles.dot}></span>
-            <span style={styles.dot}></span>
+          <div style={styles.loadingText}>
+            {debug?.realtimeMode
+              ? "🌐 Fetching verified sources..."
+              : "🧠 Thinking..."}
           </div>
         )}
 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* INPUT */}
-      <div style={styles.inputWrapper}>
+      {/* INPUT BAR */}
+      <div style={styles.inputBar}>
+        
         <button
           onClick={() => fileRef.current.click()}
-          disabled={uploadedFiles.length >= MAX_FILES}
-          style={styles.attachBtn}
+          style={styles.iconBtn}
         >
           📎
         </button>
 
         <input
-          ref={fileRef}
           type="file"
           multiple
           hidden
+          ref={fileRef}
           onChange={handleFileSelect}
         />
 
         <input
-          ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask anything..."
+          placeholder="Ask Smart Chat..."
           style={styles.input}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
         />
 
-        <button
-          onClick={handleSend}
-          disabled={loading}
-          style={styles.sendBtn}
-        >
+        <button onClick={handleSend} style={styles.sendBtn}>
           ➤
         </button>
-      </div>
 
-      {/* FOOTER */}
-      <div style={styles.footer}>
-        📎 {uploadedFiles.length}/{MAX_FILES} files connected
       </div>
-
-      {/* ANIMATION */}
-      <style>
-        {`
-          @keyframes blink {
-            0% { opacity: 0.2; }
-            20% { opacity: 1; }
-            100% { opacity: 0.2; }
-          }
-        `}
-      </style>
     </div>
-  );
+  </div>
+);
 }
 
 /* ================= STYLES ================= */
 const styles = {
-  page: {
-    height: "100vh",
+  /* ================= LAYOUT ================= */
+  container: {
     display: "flex",
-    flexDirection: "column",
-    background: "#0A0A0A",
+    height: "100vh",
+    background:
+      "radial-gradient(circle at top, #0a0a0a 0%, #000 60%, #000 100%)",
     color: "#EAEAEA",
-    fontFamily: "Segoe UI",
-    padding: 10,
+    fontFamily: "Inter, sans-serif",
   },
 
-  header: {
+  /* ================= SIDEBAR ================= */
+  sidebar: {
+    width: 280,
+    background:
+      "linear-gradient(180deg, rgba(10,10,10,0.98), rgba(5,5,5,0.95))",
+    padding: 15,
+    borderRight: "1px solid rgba(212,175,55,0.15)",
+    boxShadow: "0 0 25px rgba(212,175,55,0.05)",
+  },
+
+  brand: {
+    fontSize: 20,
+    fontWeight: 900,
+    color: "#D4AF37",
+    marginBottom: 14,
+    letterSpacing: 1,
+    textShadow: "0 0 12px rgba(212,175,55,0.4)",
+  },
+
+  newBtn: {
+    width: "100%",
+    padding: 11,
+    background:
+      "linear-gradient(135deg, #D4AF37, #f6d365)",
+    border: "none",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 900,
+    color: "#111",
+    boxShadow: "0 0 18px rgba(212,175,55,0.35)",
+    transition: "0.2s",
+  },
+
+  chatList: {
+    marginTop: 12,
+  },
+
+  chatItem: {
     display: "flex",
     justifyContent: "space-between",
-    padding: "14px 12px",
-    borderBottom: "1px solid rgba(255, 215, 0, 0.15)",
-    background: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    padding: 10,
+    background:
+      "rgba(255,255,255,0.03)",
+    marginBottom: 6,
+    borderRadius: 10,
+    border: "1px solid rgba(212,175,55,0.12)",
+    transition: "0.2s",
+  },
+
+  delBtn: {
+    background: "transparent",
+    border: "none",
+    color: "#D4AF37",
+    cursor: "pointer",
+    fontSize: 14,
+    opacity: 0.8,
+  },
+
+  /* ================= CHAT AREA ================= */
+  chatArea: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    background:
+      "radial-gradient(circle at bottom, rgba(212,175,55,0.05), transparent 60%)",
+  },
+
+  topBar: {
+    padding: "12px 16px",
+    borderBottom: "1px solid rgba(212,175,55,0.12)",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background:
+      "rgba(0,0,0,0.6)",
     backdropFilter: "blur(10px)",
   },
 
-  status: {
-    fontSize: 12,
-    opacity: 0.7,
-    color: "#D4AF37",
-  },
-
-  session: {
-    fontSize: 13,
-    opacity: 0.8,
-    color: "#D4AF37",
-  },
-
+  /* ================= CHAT BOX ================= */
   chatBox: {
     flex: 1,
     overflowY: "auto",
-    padding: 15,
-    borderRadius: 15,
-    background: "rgba(255, 215, 0, 0.04)",
-    border: "1px solid rgba(255, 215, 0, 0.08)",
-    backdropFilter: "blur(10px)",
+    padding: 14,
     display: "flex",
     flexDirection: "column",
     gap: 12,
   },
 
-  userBubble: {
-    background: "linear-gradient(135deg, #D4AF37, #8B6B00)",
-    padding: "10px 16px",
-    borderRadius: 18,
+  /* ================= MESSAGES ================= */
+  userMsg: {
+    padding: "12px 14px",
+    borderRadius: 14,
     maxWidth: "70%",
-    color: "#000",
-    fontWeight: 500,
+    alignSelf: "flex-end",
+    background:
+      "linear-gradient(135deg, #D4AF37, #ffdd77)",
+    color: "#111",
+    fontWeight: 600,
+    boxShadow: "0 0 18px rgba(212,175,55,0.25)",
   },
 
-  aiBubble: {
-    background: "rgba(255, 215, 0, 0.08)",
-    border: "1px solid rgba(255, 215, 0, 0.15)",
-    padding: "10px 16px",
-    borderRadius: 18,
+  aiMsg: {
+    padding: "12px 14px",
+    borderRadius: 14,
     maxWidth: "70%",
+    alignSelf: "flex-start",
+    background:
+      "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(212,175,55,0.15)",
     color: "#EAEAEA",
+    boxShadow: "0 0 20px rgba(0,0,0,0.4)",
   },
 
-  systemBubble: {
-    background: "rgba(255, 215, 0, 0.05)",
-    border: "1px solid rgba(255, 215, 0, 0.1)",
-    padding: 8,
-    borderRadius: 12,
-    fontSize: 12,
+  /* ================= LINKS ================= */
+  linkBox: {
+    marginTop: 10,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+
+  linkCard: {
+    padding: "10px 12px",
+    borderRadius: 10,
+    background:
+      "rgba(212,175,55,0.08)",
+    border: "1px solid rgba(212,175,55,0.2)",
     color: "#D4AF37",
-  },
-
-  typing: {
+    textDecoration: "none",
     display: "flex",
-    gap: 5,
+    justifyContent: "space-between",
+    fontSize: 13,
+    transition: "0.2s",
   },
 
-  dot: {
-    width: 6,
-    height: 6,
-    background: "#D4AF37",
-    borderRadius: "50%",
-    animation: "blink 1.4s infinite both",
-  },
-
-  inputWrapper: {
+  /* ================= INPUT ================= */
+  inputBar: {
     display: "flex",
-    gap: 10,
-    padding: "12px",
-    background: "rgba(0,0,0,0.8)",
-    borderRadius: 30,
-    border: "1px solid rgba(255, 215, 0, 0.15)",
+    padding: 12,
+    borderTop: "1px solid rgba(212,175,55,0.12)",
+    background:
+      "rgba(5,5,5,0.9)",
+    backdropFilter: "blur(10px)",
   },
 
   input: {
     flex: 1,
-    padding: 10,
-    borderRadius: 20,
-    border: "none",
-    background: "transparent",
-    color: "#EAEAEA",
+    padding: 12,
+    background: "#0d0d0d",
+    border: "1px solid rgba(212,175,55,0.2)",
+    color: "#fff",
+    borderRadius: 12,
     outline: "none",
-  },
-
-  attachBtn: {
-    width: 40,
-    borderRadius: "50%",
-    border: "1px solid rgba(255, 215, 0, 0.2)",
-    background: "rgba(0,0,0,0.5)",
-    color: "#D4AF37",
-    cursor: "pointer",
+    transition: "0.2s",
   },
 
   sendBtn: {
-    width: 40,
-    borderRadius: "50%",
+    marginLeft: 10,
+    background:
+      "linear-gradient(135deg, #D4AF37, #ffcc33)",
     border: "none",
-    background: "linear-gradient(135deg, #D4AF37, #8B6B00)",
-    color: "#000",
-    fontWeight: "bold",
-    boxShadow: "0 0 10px rgba(255, 215, 0, 0.3)",
+    padding: "10px 16px",
     cursor: "pointer",
+    borderRadius: 12,
+    fontWeight: 900,
+    color: "#111",
+    boxShadow: "0 0 18px rgba(212,175,55,0.35)",
+    transition: "0.2s",
   },
 
-  footer: {
-    textAlign: "center",
-    fontSize: 12,
-    opacity: 0.6,
-    marginTop: 5,
+  iconBtn: {
+    marginRight: 10,
+    background: "rgba(0,0,0,0.6)",
     color: "#D4AF37",
+    border: "1px solid rgba(212,175,55,0.3)",
+    borderRadius: 10,
+    padding: "8px 10px",
+    cursor: "pointer",
+    transition: "0.2s",
+  },
+
+  /* ================= STATES ================= */
+  loadingText: {
+    color: "#D4AF37",
+    fontSize: 13,
+    opacity: 0.8,
+    padding: 10,
+    textAlign: "center",
   },
 };
