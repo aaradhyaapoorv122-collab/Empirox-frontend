@@ -1,5 +1,5 @@
 /* ===================== CONFIG ===================== */
-const API_BASE = "http://localhost:5000";
+const API_BASE ="https://empirox-backend-production.up.railway.app;"
 
 /* ===================== FEATURE MAP ===================== */
 export const AI_FEATURES = {
