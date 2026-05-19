@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 export const startRazorpayPayment = async (user, plan) => {
   try {
     // 1️⃣ Create order from backend
-    const orderRes = await fetch("http://localhost:5000/create-order", {
+    const orderRes = await fetch("https://YOUR-RAILWAY-URL.up.railway/create-order",{
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -40,7 +40,7 @@ export const startRazorpayPayment = async (user, plan) => {
           }
 
           const verifyRes = await fetch(
-            "http://localhost:5000/verify-payment",
+            "https://YOUR-RAILWAY-URL.up.railway/verify-payment",
             {
               method: "POST",
               headers: {
