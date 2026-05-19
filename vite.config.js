@@ -6,6 +6,7 @@ import path from 'path'
 export default defineConfig({
   // Remove root or set it to '.' because vite.config.js is already in Frontend
   // root: '.',  // default root is current folder, so you can omit this line
+base: "./",
 
   plugins: [
     react(),

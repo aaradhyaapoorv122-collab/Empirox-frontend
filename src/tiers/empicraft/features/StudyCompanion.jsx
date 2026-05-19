@@ -56,7 +56,7 @@ async function loadUserData() {
 
     /* STUDY PLAN */
     const { data: plans } = await supabase
-      .from("Study_plans")
+      .from("study_plans")
       .select("*")
       .eq("user_id", authUser.id)
       .order("created_at", { ascending: false })
@@ -76,26 +76,59 @@ async function loadUserData() {
     const subjectMap = {};
 
     assessments?.forEach((item) => {
-      const subject = item.type || "General";
+    const subject =
+  item.subject ||
+  item.subject_name ||
+  item.type ||
+  "General";
 
       if (!subjectMap[subject]) {
         subjectMap[subject] = [];
       }
+        const score = parseFloat(item.score);
 
-      subjectMap[subject].push(Number(item.score || 0));
+subjectMap[subject].push(
+  isNaN(score) ? 0 : score
+);
     });
 
     const subjects = Object.keys(subjectMap).map((key) => {
-      const arr = subjectMap[key];
-      const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+  const arr = subjectMap[key];
+  const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
 
-      return {
-        name: key,
-        score: Math.round(avg),
-      };
-    });
+  return {
+    name: key,
+    score: Math.round(avg),
+  };
+});
 
-    const sortedWeak = [...subjects].sort((a, b) => a.score - b.score);
+/* =========================
+   FALLBACK SUBJECTS
+========================= */
+
+if (subjects.length === 0) {
+  subjects.push(
+    {
+      name: "Math",
+      score: 62,
+    },
+    {
+      name: "Science",
+      score: 58,
+    },
+    {
+      name: "English",
+      score: 74,
+    }
+  );
+}
+   const validSubjects = subjects.filter(
+  (s) => !isNaN(s.score)
+);
+
+const sortedWeak = [...validSubjects].sort(
+  (a, b) => a.score - b.score
+);
 
     const weakSubject = sortedWeak[0]?.name || "General Revision";
 
@@ -151,7 +184,11 @@ async function loadUserData() {
           ? subjects
           : [{ name: "General", score: overall }],
     };
-
+        console.log("PROFILE:", profile);
+console.log("ASSESSMENTS:", assessments);
+console.log("SUBJECTS:", subjects);
+console.log("TASKS:", tasks);
+console.log("FINAL USER:", finalUser);
     setUser(finalUser);
     setTodayTasks(tasks);
 
@@ -229,35 +266,52 @@ Give:
 5. Motivation Line
 6. Win Goal Today
 
-Keep smart, premium, short.
+Rules:
+- Only use provided student data
+- Do not invent fake marks
+- Keep response realistic
+- Keep response under 200 words
+- Give practical study advice
+
+Format:
+
+1. Study Status
+2. Priority Subject
+3. Best Study Plan
+4. Improvement Tip
+5. Motivation
+6. Today's Goal
 `;
+try {
+  const reply = await api.sendAIMessage({
+    feature: "study_companion_ai",
+    message: prompt,
+    context: user,
+  });
 
-    try {
-      const reply = await api.sendAIMessage({
-        feature: "study_companion_ai",
-        message: prompt,
-        context: user,
-      });
+  console.log("AI RAW RESPONSE:", reply);
 
-      setAiReply(reply);
-    } catch {
-      setAiReply(
-        "⚠️ AI unavailable right now. Try again."
-      );
-    }
+  const finalReply =
+    typeof reply === "string"
+      ? reply
+      : reply?.reply ||
+        reply?.message ||
+        reply?.response ||
+        reply?.text ||
+        reply?.output ||
+        "⚠️ Empty AI response.";
 
-    setLoadingAI(false);
-  }
+  setAiReply(finalReply);
 
-  async function copyReport() {
-    if (!aiReply) return;
+} catch (err) {
+  console.error(err);
 
-    await navigator.clipboard.writeText(
-      aiReply
-    );
+  setAiReply(
+    "⚠️ AI unavailable right now. Try again."
+  );
+}
 
-    alert("Copied!");
-  }
+  
 
   if (loadingPage) {
     return (
@@ -266,7 +320,7 @@ Keep smart, premium, short.
       </div>
     );
   }
-
+  }
   return (
     <div style={styles.page}>
       {/* HEADER */}
@@ -424,16 +478,7 @@ Keep smart, premium, short.
               🧠 AI Guidance
             </h3>
 
-            <button
-              style={
-                styles.copyBtn
-              }
-              onClick={
-                copyReport
-              }
-            >
-              Copy
-            </button>
+           
           </div>
 
           <pre style={styles.pre}>

@@ -17,7 +17,7 @@ export default function EmpiCraftTierSelector() {
   const [premiumPopup, setPremiumPopup] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState({
-    days: 90,
+    days: 7,
     hrs: 0,
     mins: 0,
     secs: 0,
@@ -44,7 +44,7 @@ export default function EmpiCraftTierSelector() {
       const endDate = new Date(startDate);
 
       // add 90 days = approx 3 months
-      endDate.setDate(endDate.getDate() + 21);
+      endDate.setDate(endDate.getDate() + 7);
 
       const now = new Date();
       const diff = endDate - now;

@@ -137,7 +137,7 @@ export default function EmpiCraftDashboard() {
             );
 
           end.setDate(
-            end.getDate() + 21
+            end.getDate() + 7
           );
 
           const diff =

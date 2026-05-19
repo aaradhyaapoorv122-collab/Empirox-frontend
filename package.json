@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
     "@react-navigation/native-stack": "^7.7.0",
     "@supabase/supabase-js": "^2.81.1",
     "@tailwindcss/vite": "^4.1.12",

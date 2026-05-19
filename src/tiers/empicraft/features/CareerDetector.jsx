@@ -65,7 +65,7 @@ export default function CareerDetectorPro() {
   const [country, setCountry] = useState("India");
 
   const [plans, setPlans] = useState(null);
-
+  const [loading, setLoading] = useState(false);
   /* ================= CLEAN AI RESPONSE ================= */
   const cleanAIResponse = (text) => {
     return text
@@ -105,6 +105,7 @@ export default function CareerDetectorPro() {
 
   const generatePlans = async () => {
     try {
+      setLoading(true);
       const message = `
 You are Career Intelligence AI.
 
@@ -144,12 +145,13 @@ Return ONLY valid JSON. No markdown. No explanation.
 
       setPlans(Array.isArray(parsed) ? parsed : []);
       setStep(3);
-
+setLoading(false);
     } catch (err) {
-      console.error("Career AI error:", err);
-    }
-  };
+  console.error("Career AI error:", err);
 
+  setLoading(false);
+}
+  }
   /* ================= UI ================= */
 
   return (
@@ -242,9 +244,19 @@ Return ONLY valid JSON. No markdown. No explanation.
                 Back
               </button>
 
-              <button style={ui.btnPrimary} onClick={generatePlans}>
-                Generate Plans
-              </button>
+              
+              <button
+  style={{
+    ...ui.btnPrimary,
+    opacity: loading ? 0.7 : 1,
+  }}
+  onClick={generatePlans}
+  disabled={loading}
+>
+  {loading
+    ? "Analyzing Career Profile..."
+    : "Generate Plans"}
+</button>
             </div>
           </>
         )}
@@ -271,10 +283,6 @@ Return ONLY valid JSON. No markdown. No explanation.
                     ))}
                   </div>
 
-                  <div style={ui.actions}>
-                    <button style={ui.btnPrimarySmall}>🚀 Roadmap</button>
-                    <button style={ui.btnSecondarySmall}>📘 Skills</button>
-                  </div>
                 </div>
               ))}
             </div>

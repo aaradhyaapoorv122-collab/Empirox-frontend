@@ -369,8 +369,7 @@ async function handleForgotPassword() {
       await supabase.auth.resetPasswordForEmail(
         email.trim(),
         {
-          redirectTo:
-           window.location.origin + "/empicraft/reset-password"
+         redirectTo: "https://empiroxmindcraft.in/empicraft/reset-password"
         }
       );
 
@@ -538,12 +537,11 @@ const handleGoogle = async () => {
   await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.origin + "/login",
+      redirectTo: "https://empiroxmindcraft.in/login",
       skipBrowserRedirect: false
     }
   });
 };
-
   return (
     <div style={styles.page}>
       <motion.div
