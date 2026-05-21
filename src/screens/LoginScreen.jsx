@@ -14,7 +14,7 @@ import { AuthContext } from "../context/AuthContext";
 export default function AuthScreen() {
   const navigate = useNavigate();
 
-  const { setUser } =
+  const { login } =
     useContext(AuthContext);
 
   const [name, setName] =
@@ -178,7 +178,7 @@ export default function AuthScreen() {
            GLOBAL USER
         ========================== */
 
-        setUser(authUser);
+        login(authUser);
 
         console.log(
           "AUTH SUCCESS"

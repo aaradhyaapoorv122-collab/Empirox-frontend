@@ -198,7 +198,7 @@ useEffect(() => {
         content: m.text,
       }));
 
-    const res = await fetch("https://empirox-backend-production.up.railway.app", {
+    const res = await fetch("https://empirox-backend-production.up.railway.app/ai/core", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

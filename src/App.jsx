@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 /* ================= SCREENS ================= */
 import LoginScreen from "./screens/LoginScreen";
-import SignupScreen from "./screens/SignupScreen";
+
 import TierSelector from "./components/TierSelector";
 
 /* ================= CONTEXT ================= */
@@ -23,10 +23,10 @@ import TestReview from "./tiers/empicraft/features/TestReview";
 import SummaryMode from "./tiers/empicraft/features/SummaryMode";
 import DoubtSolver from "./tiers/empicraft/features/DoubtSolver";
 import StudyCompanion from "./tiers/empicraft/features/StudyCompanion";
-import SkillHub from "./tiers/empicraft/features/SkillHub";
+
 import ProjectMaker from "./tiers/empicraft/features/ProjectMaker";
 import CareerDetector from "./tiers/empicraft/features/CareerDetector";
-import ResetPassword from "./tiers/empicraft/features/ResetPassword";
+
 
 export default function App() {
   const { user, loadingUser } = useContext(AuthContext);
@@ -39,7 +39,7 @@ export default function App() {
       {!user && (
         <>
           <Route path="/login" element={<LoginScreen />} />
-          <Route path="/signup" element={<SignupScreen />} />
+          
           <Route path="*" element={<Navigate to="/login" replace />} />
         </>
       )}
@@ -78,8 +78,7 @@ export default function App() {
             <Route path="/empicraft/study-companion" element={<StudyCompanion />} />
             <Route path="/empicraft/career-detector" element={<CareerDetector />} />
             <Route path="/empicraft/project-maker" element={<ProjectMaker />} />
-            <Route path="/empicraft/Skill-Hub" element={<SkillHub />} />
-            <Route path="reset-password" element={<ResetPassword />} />
+            
             </Route>
  
 
