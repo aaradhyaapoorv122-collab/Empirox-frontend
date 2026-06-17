@@ -27,6 +27,10 @@ import StudyCompanion from "./tiers/empicraft/features/StudyCompanion";
 import ProjectMaker from "./tiers/empicraft/features/ProjectMaker";
 import CareerDetector from "./tiers/empicraft/features/CareerDetector";
 
+/* ================= POLICIES ================= */
+import PrivacyPolicy from "./screens/policies/PrivacyPolicy";
+import TermsOfService from "./screens/policies/TermsOfService";
+
 
 export default function App() {
   const { user, loadingUser } = useContext(AuthContext);
@@ -35,14 +39,32 @@ export default function App() {
  
   return (
     <Routes>
-      {/* ================= PUBLIC ================= */}
-      {!user && (
-        <>
-          <Route path="/login" element={<LoginScreen />} />
-          
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </>
-      )}
+      
+{/* ================= PUBLIC ================= */}
+{!user && (
+  <>
+    <Route path="/login" element={<LoginScreen />} />
+
+    {/* Privacy Policy */}
+    <Route
+      path="/privacy-policy"
+      element={<PrivacyPolicy />}
+    />
+
+    {/* Terms & Conditions */}
+    <Route
+      path="/terms"
+      element={<TermsOfService />}
+    />
+
+    <Route
+      path="*"
+      element={<Navigate to="/login" replace />}
+    />
+  </>
+)}
+
+
 
       {/* ================= PROTECTED ================= */}
       {user && (

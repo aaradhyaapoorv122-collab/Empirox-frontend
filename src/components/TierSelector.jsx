@@ -132,18 +132,22 @@ export default function EmpiCraftTierSelector() {
   };
 
   // 2️⃣ ADD THIS FUNCTION INSIDE COMPONENT
-const handleLogout = async () => {
+const handleLogout = async (e) => {
+  if (e) e.stopPropagation();
+
   try {
     await supabase.auth.signOut();
 
-    localStorage.removeItem("empicraft_trial_start");
-    localStorage.removeItem("empicraft_plan");
-    localStorage.removeItem("empirox_user");
-    localStorage.removeItem("empirox_profile");
+    localStorage.clear();
 
-    navigate("/login", { replace: true });
-  } catch (error) {
-    navigate("/login", { replace: true });
+    const { login } = useContext(AuthContext);
+    login(null);
+
+    window.location.href = "/login";
+
+  } catch (err) {
+    localStorage.clear();
+    window.location.href = "/login";
   }
 };
 
@@ -173,20 +177,23 @@ const handleLogout = async () => {
 
       <div style={styles.wrapper}>
         {/* HEADER */}
-        <div style={styles.header}>
-          <div style={styles.logo}>👑</div>
-          <div style={styles.brand}>EmpiCraft</div>
-          <div style={styles.tag}>
-            AI Learning. Unlimited Potential.
-             <button
+       <div style={styles.header}>
+  <div style={styles.logo}>👑</div>
+
+  <div style={styles.brand}>EmpiCraft</div>
+
+  <div style={styles.tag}>
+    AI Learning. Unlimited Potential.
+  </div>
+
+  <button
     style={styles.logoutBtn}
     onClick={handleLogout}
   >
     Logout ↗
-    </button>
-          </div>
-        </div>
-
+  </button>
+</div>
+  
         {/* MAIN CARD */}
         <div style={styles.mainCard}>
           {/* FREE */}
@@ -404,9 +411,14 @@ const styles = {
   },
 
   header: {
-    textAlign: "center",
-    marginBottom: "25px",
-  },
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  flexWrap: "wrap",
+  gap: "12px",
+  textAlign: "center",
+  marginBottom: "25px",
+},
 
   logo: { fontSize: "42px" },
 
@@ -417,10 +429,12 @@ const styles = {
   },
 
   tag: {
-    color: "#aaa",
-    marginTop: "5px",
-    fontSize: "20px",
-  },
+  color: "#aaa",
+  fontSize: "20px",
+  width: "100%",
+  textAlign: "center",
+  marginTop: "8px",
+},
 
   mainCard: {
     border: `1px solid ${gold}55`,

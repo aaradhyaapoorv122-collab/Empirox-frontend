@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">MINDCRAFT</string>
-    <string name="title_activity_main">MINDCRAFT</string>
-    <string name="package_name">com.empirox.app</string>
-    <string name="custom_url_scheme">com.empirox.app</string>
+    <string name="app_name">Mindcraft</string>
+    <string name="title_activity_main">Mindcraft</string>
+    <string name="package_name">com.Mindcraft.app</string>
+    <string name="custom_url_scheme">com.Mindcraft.app</string>
 </resources>

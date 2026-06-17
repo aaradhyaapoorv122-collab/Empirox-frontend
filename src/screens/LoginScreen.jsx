@@ -4,250 +4,180 @@ import React, {
   useMemo,
   useContext,
 } from "react";
-
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { AuthContext } from "../context/AuthContext";
 
-export default function AuthScreen() {
+const gold = "#d4af37";
+
+export default function LoginScreen() {
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
-  const { login } =
-    useContext(AuthContext);
+  const [name, setName] = useState("");
+  const [standard, setStandard] = useState("1");
+  const [email, setEmail] = useState("");
 
-  const [name, setName] =
-    useState("");
-
-  const [standard, setStandard] =
-    useState("1");
-
-  const [error, setError] =
-    useState("");
-
-  const [loading, setLoading] =
+  const [acceptedTerms, setAcceptedTerms] =
     useState(false);
 
-  const STANDARDS =
-    useMemo(
-      () =>
-        Array.from(
-          { length: 12 },
-          (_, i) => `${i + 1}`
-        ).concat([
-          "Above 12",
-        ]),
-      []
-    );
+  const [acceptedPrivacy, setAcceptedPrivacy] =
+    useState(false);
 
-  /* ==============================
-     DEVICE ID
-  ============================== */
-  function getDeviceId() {
-    let id =
-      localStorage.getItem(
-        "empirox_device_id"
+  const [loading, setLoading] = useState(false);
+
+  const [error, setError] = useState("");
+
+  const STANDARDS = useMemo(
+    () =>
+      Array.from(
+        { length: 12 },
+        (_, i) => `${i + 1}`
+      ).concat(["Above 12"]),
+    []
+  );
+
+  const sendLoginLink = async () => {
+    setError("");
+
+    if (!name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Please enter your email.");
+      return;
+    }
+
+    if (!acceptedTerms || !acceptedPrivacy) {
+      setError(
+        "Please accept Terms & Conditions and Privacy Policy."
       );
+      return;
+    }
 
-    if (!id) {
-      id =
-        "dev_" +
-        crypto.randomUUID();
+    try {
+      setLoading(true);
 
       localStorage.setItem(
-        "empirox_device_id",
-        id
+        "empirox_signup",
+        JSON.stringify({
+          name,
+          standard,
+          email,
+        })
       );
+
+    const { data, error } =
+  await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: "https://empiroxmindcraft.in",
+    },
+  });
+
+console.log("OTP RESULT:", { data, error });
+      if (error) {
+        setError(error.message);
+      } else {
+        alert(
+          "Login link sent. Please check your email."
+        );
+      }
+    } catch (err) {
+      setError(
+        err.message ||
+          "Something went wrong."
+      );
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return id;
-  }
-
-  /* ==============================
-     LOAD SAVED USER
-  ============================== */
   useEffect(() => {
-    const saved =
-      localStorage.getItem(
-        "empirox_user"
-      );
+  const handleSession = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (saved) {
-      try {
-        const parsed =
-          JSON.parse(saved);
+    if (!session) return;
 
-        if (parsed?.name)
-          setName(parsed.name);
+    const user = session.user;
 
-        if (parsed?.standard)
-          setStandard(
-            parsed.standard
-          );
-      } catch {}
-    }
-  }, []);
-
-  /* ==============================
-     SAVE PROFILE
-  ============================== */
-  async function saveProfile(
-    authUser,
-    deviceId
-  ) {
-    const payload = {
-      id: authUser.id,
-      device_id: deviceId,
-
-      name,
-      standard,
-
-      role: "student",
-      tier_plan: "free",
-
-      updated_at:
-        new Date().toISOString(),
-    };
-
-    localStorage.setItem(
-      "empirox_user",
-      JSON.stringify(payload)
+    const storedData = JSON.parse(
+      localStorage.getItem("empirox_signup") || "{}"
     );
 
-    await supabase
+    const name =
+      user.user_metadata?.name ||
+      storedData.name ||
+      "Student";
+
+    const standard =
+      user.user_metadata?.standard ||
+      storedData.standard ||
+      "1";
+
+    const payload = {
+      id: user.id,
+      email: user.email,
+      name,
+      standard,
+      role: "student",
+      tier_plan: "free",
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: dbError } = await supabase
       .from("profiles")
       .upsert(payload, {
         onConflict: "id",
       });
-  }
 
-  /* ==============================
-     START APP
-  ============================== */
-  const handleStart =
-    async () => {
-      if (
-        !name ||
-        !standard
-      ) {
-        setError(
-          "Please enter name and class"
-        );
-        return;
-      }
+    if (dbError) {
+      console.log("DB Error:", dbError);
+    }
 
-      setLoading(true);
-      setError("");
+    login(user);
 
-      try {
-        /* ==========================
-           REAL AUTH SESSION
-        ========================== */
+    navigate("/tier-selector", {
+      replace: true,
+    });
+  };
 
-        const {
-          data,
-          error,
-        } =
-          await supabase.auth.signInAnonymously();
+  handleSession();
+}, [login, navigate]);
 
-        if (error)
-          throw error;
-
-        const authUser =
-          data.user;
-
-        if (!authUser)
-          throw new Error(
-            "User creation failed"
-          );
-
-        const deviceId =
-          getDeviceId();
-
-        /* ==========================
-           SAVE PROFILE
-        ========================== */
-
-        await saveProfile(
-          authUser,
-          deviceId
-        );
-
-        /* ==========================
-           GLOBAL USER
-        ========================== */
-
-        login(authUser);
-
-        console.log(
-          "AUTH SUCCESS"
-        );
-
-        /* ==========================
-           NAVIGATION
-        ========================== */
-
-        navigate(
-          "/tier-selector",
-          {
-            replace: true,
-          }
-        );
-      } catch (err) {
-        console.error(err);
-
-        setError(
-          err.message ||
-            "Something went wrong"
-        );
-      }
-
-      setLoading(false);
-    };
-
-  /* ==============================
-     UI
-  ============================== */
   return (
     <div style={styles.page}>
       <motion.div
         initial={{
           opacity: 0,
-          y: 30,
-          scale: 0.98,
+          y: 25,
         }}
         animate={{
           opacity: 1,
           y: 0,
-          scale: 1,
-        }}
-        transition={{
-          duration: 0.5,
         }}
         style={styles.card}
       >
-        <div
-          style={styles.glowBox}
-        />
-
         <h1 style={styles.title}>
-          Empirox
+          Welcome to Empirox
         </h1>
 
         <p style={styles.sub}>
-          Premium AI Learning
-          System
+          Create your account or sign in
+          securely using email.
         </p>
 
         <input
           style={styles.input}
-          placeholder="Enter Your Name"
+          placeholder="Full Name"
           value={name}
           onChange={(e) =>
-            setName(
-              e.target.value
-            )
+            setName(e.target.value)
           }
         />
 
@@ -255,109 +185,142 @@ export default function AuthScreen() {
           style={styles.input}
           value={standard}
           onChange={(e) =>
-            setStandard(
-              e.target.value
-            )
+            setStandard(e.target.value)
           }
         >
-          {STANDARDS.map(
-            (s) => (
-              <option key={s}>
-                {s}
-              </option>
-            )
-          )}
+          {STANDARDS.map((s) => (
+            <option key={s}>
+              {s}
+            </option>
+          ))}
         </select>
 
-        {error && (
-          <div
-            style={styles.error}
+        <input
+          style={styles.input}
+          type="email"
+          placeholder="Email Address"
+          value={email}
+          onChange={(e) =>
+            setEmail(e.target.value)
+          }
+        />
+
+        <div
+          style={styles.checkboxContainer}
+        >
+          <label
+            style={styles.checkboxLabel}
           >
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) =>
+                setAcceptedTerms(
+                  e.target.checked
+                )
+              }
+            />
+
+            <span>
+              I agree to the{" "}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noreferrer"
+                style={styles.link}
+              >
+                Terms & Conditions
+              </a>
+            </span>
+          </label>
+
+          <label
+            style={styles.checkboxLabel}
+          >
+            <input
+              type="checkbox"
+              checked={acceptedPrivacy}
+              onChange={(e) =>
+                setAcceptedPrivacy(
+                  e.target.checked
+                )
+              }
+            />
+
+            <span>
+              I agree to the{" "}
+              <a
+                href="/privacy-policy"
+                target="_blank"
+                rel="noreferrer"
+                style={styles.link}
+              >
+                Privacy Policy
+              </a>
+            </span>
+          </label>
+        </div>
+
+        {error && (
+          <div style={styles.error}>
             {error}
           </div>
         )}
 
         <button
           style={styles.button}
-          onClick={handleStart}
+          onClick={sendLoginLink}
           disabled={loading}
         >
           {loading
-            ? "Starting..."
-            : "Enter Empirox 🚀"}
+            ? "Sending..."
+            : "Continue"}
         </button>
 
         <p style={styles.footer}>
-          Secure Device Session •
-          Premium Experience
+          Secure Authentication •
+          Privacy Protected •
+          Supabase Auth
         </p>
       </motion.div>
     </div>
   );
 }
 
-/* ==============================
-   PREMIUM UI
-============================== */
-
-const gold =
-  "#d4af37";
-
 const styles = {
   page: {
     minHeight: "100vh",
     display: "flex",
-    justifyContent:
-      "center",
-    alignItems:
-      "center",
+    justifyContent: "center",
+    alignItems: "center",
     background:
       "radial-gradient(circle at top,#141414,#000 70%)",
+    padding: 20,
     fontFamily:
       "Inter, sans-serif",
-    padding: 20,
   },
 
   card: {
     width: "100%",
-    maxWidth: 430,
+    maxWidth: 460,
     padding: 32,
     borderRadius: 26,
-    position: "relative",
     background:
       "rgba(255,255,255,0.05)",
     border: `1px solid ${gold}55`,
-    backdropFilter:
-      "blur(22px)",
-    color: "white",
-    boxShadow: `0 0 40px ${gold}22`,
-    overflow: "hidden",
-  },
-
-  glowBox: {
-    position: "absolute",
-    top: -60,
-    left: -60,
-    width: 200,
-    height: 200,
-    background: gold,
-    filter: "blur(120px)",
-    opacity: 0.25,
-    borderRadius: "50%",
+    backdropFilter: "blur(22px)",
+    color: "#fff",
   },
 
   title: {
-    fontSize: 36,
+    fontSize: 34,
     fontWeight: 900,
     color: gold,
-    margin: 0,
-    letterSpacing: 1,
   },
 
   sub: {
     color: "#aaa",
-    marginBottom: 20,
-    fontSize: 14,
+    marginBottom: 18,
   },
 
   input: {
@@ -367,38 +330,56 @@ const styles = {
     borderRadius: 14,
     border: `1px solid ${gold}33`,
     background: "#111",
-    color: "white",
-    outline: "none",
-    fontSize: 14,
+    color: "#fff",
+    boxSizing: "border-box",
+  },
+
+  checkboxContainer: {
+    marginTop: 18,
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
+
+  checkboxLabel: {
+    display: "flex",
+    gap: 10,
+    alignItems: "flex-start",
+    color: "#ddd",
+    fontSize: 13,
+  },
+
+  link: {
+    color: gold,
+    textDecoration: "none",
+    fontWeight: 700,
   },
 
   button: {
     width: "100%",
     padding: 14,
-    marginTop: 18,
+    marginTop: 20,
     borderRadius: 14,
     border: "none",
-    fontWeight: 800,
     cursor: "pointer",
+    fontWeight: 800,
     background: `linear-gradient(135deg, ${gold}, #b8860b)`,
-    color: "#000",
-    boxShadow: `0 0 25px ${gold}33`,
   },
 
   error: {
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 10,
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
     background:
       "rgba(255,0,0,0.15)",
     color: "#ff4d4d",
-    fontSize: 13,
   },
 
   footer: {
-    marginTop: 14,
-    fontSize: 12,
-    color: "#888",
+    marginTop: 16,
     textAlign: "center",
+    color: "#888",
+    fontSize: 12,
   },
 };
+

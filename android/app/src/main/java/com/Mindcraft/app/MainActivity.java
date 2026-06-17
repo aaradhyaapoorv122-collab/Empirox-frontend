@@ -1,4 +1,4 @@
-package com.empirox.app;
+package com.Mindcraft.app;
 
 import com.getcapacitor.BridgeActivity;
 
