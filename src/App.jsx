@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 /* ================= SCREENS ================= */
 import LoginScreen from "./screens/LoginScreen";
+import SignInScreen from "./screens/SignInScreen";
 
 import TierSelector from "./components/TierSelector";
 
@@ -35,82 +36,57 @@ import TermsOfService from "./screens/policies/TermsOfService";
 export default function App() {
   const { user, loadingUser } = useContext(AuthContext);
 
-  /* ========== EMPI REMINDER ENGINE ========== */
- 
+  if (loadingUser) {
+    return (
+      <div style={{ color: "#d4af37", textAlign: "center", marginTop: 100 }}>
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <Routes>
-      
-{/* ================= PUBLIC ================= */}
-{!user && (
-  <>
-    <Route path="/login" element={<LoginScreen />} />
 
-    {/* Privacy Policy */}
-    <Route
-      path="/privacy-policy"
-      element={<PrivacyPolicy />}
-    />
+      {/* ================= PUBLIC ================= */}
+      <Route path="/login" element={<LoginScreen />} />
+      <Route path="/signin" element={<SignInScreen />} />
 
-    {/* Terms & Conditions */}
-    <Route
-      path="/terms"
-      element={<TermsOfService />}
-    />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
 
-    <Route
-      path="*"
-      element={<Navigate to="/login" replace />}
-    />
-  </>
-)}
-
-
+      {/* redirect if not logged in */}
+      {!user && (
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      )}
 
       {/* ================= PROTECTED ================= */}
       {user && (
         <>
-          {/* Tier Selector */}
           <Route path="/tier-selector" element={<TierSelector />} />
 
-          {/* ===== EMPICRAFT DASHBOARD (NO SIDEBAR) ===== */}
           <Route
             path="/empicraft/dashboard"
-            element={
-                <EmpiCraftDashboard />
-              
-            }
+            element={<EmpiCraftDashboard />}
           />
 
-          {/* ===== EMPICRAFT FEATURES (WITH SIDEBAR) ===== */}
-          <Route
-            path="/empicraft"
-            element={
-             
-                <EmpiCraftFeatureLayout />
-              
-            }
-          >
+          <Route path="/empicraft" element={<EmpiCraftFeatureLayout />}>
             <Route path="smart-chat" element={<SmartChat />} />
             <Route path="study-planner" element={<StudyPlanner />} />
             <Route path="quiz-arena" element={<QuizArena />} />
             <Route path="test-review" element={<TestReview />} />
             <Route path="concept-block-builder" element={<ConceptBlocks />} />
             <Route path="AI-Summary-Mode" element={<SummaryMode />} />
-            <Route path="/empicraft/doubt-solver" element={<DoubtSolver />} />
-            <Route path="/empicraft/study-companion" element={<StudyCompanion />} />
-            <Route path="/empicraft/career-detector" element={<CareerDetector />} />
-            <Route path="/empicraft/project-maker" element={<ProjectMaker />} />
-            
-            </Route>
- 
+            <Route path="doubt-solver" element={<DoubtSolver />} />
+            <Route path="study-companion" element={<StudyCompanion />} />
+            <Route path="career-detector" element={<CareerDetector />} />
+            <Route path="project-maker" element={<ProjectMaker />} />
+          </Route>
 
-         
-
-          {/* ===== DEFAULT ===== */}
           <Route path="/" element={<Navigate to="/tier-selector" replace />} />
           <Route path="*" element={<Navigate to="/tier-selector" replace />} />
         </>
       )}
+
     </Routes>
   );
 }

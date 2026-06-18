@@ -6,45 +6,29 @@ import { AuthContext } from "../context/AuthContext";
 
 const gold = "#d4af37";
 
-export default function LoginScreen() {
+export default function SignInScreen() {
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
 
-  const [name, setName] = useState("");
-  const [standard, setStandard] = useState("1");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const [agreed, setAgreed] = useState(false);
-
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = async () => {
+  const handleLogin = async () => {
     setError("");
 
-    if (!name || !email || !password) {
-      setError("Please fill all fields");
-      return;
-    }
-
-    if (!agreed) {
-      setError("Please accept Terms & Privacy Policy");
+    if (!email || !password) {
+      setError("Enter email and password");
       return;
     }
 
     try {
       setLoading(true);
 
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          data: {
-            name,
-            standard,
-          },
-        },
       });
 
       if (error) {
@@ -52,14 +36,8 @@ export default function LoginScreen() {
         return;
       }
 
-      const user = data.user;
-
-      if (user) {
-        login(user);
-        navigate("/tier-selector", { replace: true });
-      } else {
-        setError("Check your email to confirm account");
-      }
+      login(data.user);
+      navigate("/tier-selector", { replace: true });
     } catch (err) {
       setError(err.message || "Something went wrong");
     } finally {
@@ -78,45 +56,32 @@ export default function LoginScreen() {
 
   return (
     <div style={styles.page}>
+      {/* BACKGROUND GLOW */}
+      <div style={styles.bgGlow} />
+
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.5 }}
         style={styles.card}
       >
         {/* TITLE */}
-        <h1 style={styles.title}>Create Account</h1>
-        <p style={styles.subtitle}>Join Empirox Mindcraft</p>
-
-        {/* NAME */}
-        <motion.input
-          whileFocus={{ scale: 1.02 }}
-          style={styles.input}
-          placeholder="Full Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-
-        {/* STANDARD */}
-        <select
-          style={styles.input}
-          value={standard}
-          onChange={(e) => setStandard(e.target.value)}
+        <motion.h1
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={styles.title}
         >
-          {[...Array(12)].map((_, i) => (
-            <option key={i} value={i + 1}>
-              Standard {i + 1}
-            </option>
-          ))}
-          <option value="Above 12">Above 12</option>
-        </select>
+          Welcome Back
+        </motion.h1>
+
+        <p style={styles.subtitle}>Sign in to continue to Empirox</p>
 
         {/* EMAIL */}
         <motion.input
           whileFocus={{ scale: 1.02 }}
           style={styles.input}
           type="email"
-          placeholder="Email"
+          placeholder="Email address"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -142,55 +107,64 @@ export default function LoginScreen() {
           </motion.div>
         )}
 
-        {/* TERMS CHECKBOX */}
-        <div style={styles.checkboxWrap}>
-          <input
-            type="checkbox"
-            checked={agreed}
-            onChange={() => setAgreed(!agreed)}
-            style={styles.checkbox}
-          />
-
-          <p style={styles.checkboxText}>
-            I agree to the{" "}
-            <span style={styles.link} onClick={() => navigate("/terms")}>
-              Terms of Service
-            </span>{" "}
-            and{" "}
-            <span style={styles.link} onClick={() => navigate("/privacy-policy")}>
-              Privacy Policy
-            </span>
-          </p>
-        </div>
-
-        {/* REGISTER BUTTON */}
+        {/* SIGN IN BUTTON */}
         <motion.button
-          whileTap={{ scale: 0.97 }}
+          whileTap={{ scale: 0.98 }}
           style={{
             ...styles.button,
-            opacity: loading || !agreed ? 0.6 : 1,
-            cursor: loading || !agreed ? "not-allowed" : "pointer",
+            opacity: loading ? 0.7 : 1,
+            cursor: loading ? "not-allowed" : "pointer",
           }}
-          onClick={handleRegister}
-          disabled={loading || !agreed}
+          onClick={handleLogin}
+          disabled={loading}
         >
-          {loading ? "Creating Account..." : "Create Account"}
+          {loading ? "Signing you in..." : "Sign In"}
         </motion.button>
 
-        {/* GOOGLE */}
+        {/* DIVIDER */}
+        <div style={styles.divider}>
+          <span style={styles.dividerText}>OR</span>
+        </div>
+
+        {/* GOOGLE LOGIN */}
         <motion.button
           whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
+          whileTap={{ scale: 0.98 }}
           style={styles.google}
           onClick={googleLogin}
         >
           Continue with Google
         </motion.button>
 
-        {/* SWITCH */}
-        <p style={styles.switch} onClick={() => navigate("/signin")}>
-          Already have an account? Sign In
-        </p>
+        {/* FOOTER LINKS */}
+        <div style={styles.footer}>
+          <p style={styles.footerText}>
+            New user?{" "}
+            <span
+              style={styles.link}
+              onClick={() => navigate("/login")}
+            >
+              Create account
+            </span>
+          </p>
+
+          <p style={styles.footerSmall}>
+            By continuing, you agree to our{" "}
+            <span
+              style={styles.link}
+              onClick={() => navigate("/terms")}
+            >
+              Terms
+            </span>{" "}
+            and{" "}
+            <span
+              style={styles.link}
+              onClick={() => navigate("/privacy-policy")}
+            >
+              Privacy Policy
+            </span>
+          </p>
+        </div>
       </motion.div>
     </div>
   );
@@ -204,29 +178,44 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    background: "radial-gradient(circle at top,#111,#000)",
+    background: "radial-gradient(circle at top, #111, #000)",
+    position: "relative",
+    overflow: "hidden",
+  },
+
+  bgGlow: {
+    position: "absolute",
+    width: 400,
+    height: 400,
+    background: gold,
+    filter: "blur(150px)",
+    opacity: 0.15,
+    top: "-100px",
+    left: "-100px",
   },
 
   card: {
-    width: 430,
+    width: 420,
     padding: 32,
     borderRadius: 18,
     background: "rgba(255,255,255,0.06)",
     border: `1px solid ${gold}`,
+    backdropFilter: "blur(12px)",
     color: "#fff",
-    backdropFilter: "blur(10px)",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
   },
 
   title: {
     color: gold,
-    fontSize: 28,
-    marginBottom: 4,
+    fontSize: 30,
+    marginBottom: 5,
+    fontWeight: "bold",
   },
 
   subtitle: {
     color: "#aaa",
     fontSize: 13,
-    marginBottom: 18,
+    marginBottom: 20,
   },
 
   input: {
@@ -235,7 +224,7 @@ const styles = {
     marginBottom: 12,
     borderRadius: 10,
     background: "#111",
-    border: "1px solid #444",
+    border: "1px solid #333",
     color: "#fff",
     outline: "none",
   },
@@ -269,22 +258,31 @@ const styles = {
     marginBottom: 10,
   },
 
-  checkboxWrap: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 10,
-    marginTop: 8,
-    marginBottom: 8,
+  divider: {
+    margin: "15px 0",
+    textAlign: "center",
+    position: "relative",
   },
 
-  checkbox: {
-    marginTop: 3,
-  },
-
-  checkboxText: {
+  dividerText: {
     fontSize: 12,
+    color: "#666",
+  },
+
+  footer: {
+    marginTop: 18,
+    textAlign: "center",
+  },
+
+  footerText: {
     color: "#aaa",
-    lineHeight: "1.4",
+    fontSize: 13,
+    marginBottom: 6,
+  },
+
+  footerSmall: {
+    color: "#666",
+    fontSize: 11,
   },
 
   link: {
@@ -292,13 +290,5 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
     textDecoration: "underline",
-  },
-
-  switch: {
-    marginTop: 15,
-    color: gold,
-    cursor: "pointer",
-    textAlign: "center",
-    fontSize: 13,
   },
 };
