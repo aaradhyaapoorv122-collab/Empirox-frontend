@@ -117,7 +117,6 @@ export default function EmpiCraftTierSelector() {
 
  const startPremium = async () => {
   try {
-    // 1️⃣ CREATE ORDER
     const res = await fetch(
       "https://empirox-backend-production.up.railway.app/create-order",
       {
@@ -132,7 +131,6 @@ export default function EmpiCraftTierSelector() {
     const data = await res.json();
     console.log("CREATE ORDER RESPONSE:", data);
 
-    // 2️⃣ SAFE CHECK (IMPORTANT)
     if (!res.ok || !data.success || !data.order) {
       alert(data.message || "Failed to create order");
       return;
@@ -140,31 +138,28 @@ export default function EmpiCraftTierSelector() {
 
     const razorOrder = data.order;
 
-    if (!razorOrder?.id || !razorOrder?.amount) {
-      alert("Invalid order received from server");
-      return;
-    }
-
-    // 3️⃣ CHECK RAZORPAY LOADED
     if (!window.Razorpay) {
       alert("Razorpay SDK not loaded");
       return;
     }
 
-    // 4️⃣ OPTIONS
     const options = {
-      key: "YOUR_RAZORPAY_KEY_ID", // replace with real key
+      key: "rzp_live_T596teW6GxIj86",
       amount: razorOrder.amount,
       currency: razorOrder.currency,
       name: "EmpiCraft",
       description: "Premium Plan",
       order_id: razorOrder.id,
 
+      // ✅ IMPORTANT (LIVE STABILITY)
+      prefill: {
+        name: "EmpiCraft User",
+        email: "user@empirox.com",
+        contact: "9999999999",
+      },
+
       handler: async function (response) {
         try {
-          console.log("PAYMENT RESPONSE:", response);
-
-          // 5️⃣ VERIFY PAYMENT
           const verifyRes = await fetch(
             "https://empirox-backend-production.up.railway.app/verify-payment",
             {
@@ -182,14 +177,15 @@ export default function EmpiCraftTierSelector() {
             }
           );
 
-          const verifyData = await verifyRes.json();
+          const verifyData = await verifyRes.json().catch(() => ({}));
+
           console.log("VERIFY RESPONSE:", verifyData);
 
-          if (verifyData.success) {
+          if (verifyData?.success) {
             alert("Payment Successful 🎉");
             navigate("/empicraft/dashboard");
           } else {
-            alert(verifyData.message || "Payment verification failed");
+            alert(verifyData?.message || "Payment verification failed");
           }
         } catch (err) {
           console.error("Verification error:", err);
@@ -202,12 +198,11 @@ export default function EmpiCraftTierSelector() {
       },
     };
 
-    // 6️⃣ OPEN PAYMENT
     const rzp = new window.Razorpay(options);
 
     rzp.on("payment.failed", function (response) {
       console.error("PAYMENT FAILED:", response.error);
-      alert("Payment failed. Try again.");
+      alert(response.error.description || "Payment failed");
     });
 
     rzp.open();
@@ -216,7 +211,6 @@ export default function EmpiCraftTierSelector() {
     alert("Something went wrong. Please try again.");
   }
 };
-
   // 2️⃣ ADD THIS FUNCTION INSIDE COMPONENT
 const handleLogout = async (e) => {
   if (e) e.stopPropagation();

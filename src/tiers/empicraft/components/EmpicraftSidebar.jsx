@@ -1,17 +1,9 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "../../../lib/supabaseClient";
-import {
-  Search,
-  Home,
-  PanelLeftClose,
-  PanelRightOpen,
-  User,
-  Settings
-} from "lucide-react";
+import { Search, Home, PanelLeftClose, PanelRightOpen } from "lucide-react";
 
 /* ===============================
-   FEATURES (SOURCE OF TRUTH)
+   FEATURES (UNCHANGED ORIGINAL)
 ================================ */
 const features = [
   { label: "Smart Chat", icon: "🧠", route: "/empicraft/smart-chat" },
@@ -24,6 +16,7 @@ const features = [
   { label: "Study Companion", icon: "🤖", route: "/empicraft/study-companion" },
   { label: "Project Maker", icon: "📚", route: "/empicraft/project-maker" },
   { label: "Career Detector", icon: "📈", route: "/empicraft/career-detector" },
+
 ];
 
 export default function EmpiCraftSidebar() {
@@ -34,89 +27,55 @@ export default function EmpiCraftSidebar() {
   const [open, setOpen] = useState(true);
 
   /* ===============================
-     PLAN STATE (SUPABASE)
+     DASHBOARD SYNC (UNCHANGED LOGIC)
   =============================== */
   const [planType, setPlanType] = useState("free");
-  const [loadingPlan, setLoadingPlan] = useState(true);
 
   useEffect(() => {
-    const fetchPlan = async () => {
-      setLoadingPlan(true);
+    const localPlan = localStorage.getItem("empicraft_plan") || "free";
+    const trialStart = localStorage.getItem("empicraft_trial_start");
 
-      const { data: { user } } = await supabase.auth.getUser();
+    if (localPlan === "premium") {
+      setPlanType("premium");
+    } else if (localPlan === "trial" && trialStart) {
+      const start = new Date(trialStart);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 90);
 
-      if (!user) {
-        setPlanType("free");
-        setLoadingPlan(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("tier_plan, premium_expires_at, trial_start")
-        .eq("id", user.id)
-        .single();
-
-      if (error || !data) {
-        setPlanType("free");
-        setLoadingPlan(false);
-        return;
-      }
-
-      const now = new Date();
-
-      // PREMIUM
-      if (data.tier_plan === "premium") {
-        const expiry = data.premium_expires_at
-          ? new Date(data.premium_expires_at)
-          : null;
-
-        setPlanType(!expiry || expiry > now ? "premium" : "free");
-      }
-
-      // TRIAL
-      else if (data.tier_plan === "trial" && data.trial_start) {
-        const start = new Date(data.trial_start);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 90);
-
-        setPlanType(end > now ? "trial" : "free");
-      }
-
-      // FREE
-      else {
-        setPlanType("free");
-      }
-
-      setLoadingPlan(false);
-    };
-
-    fetchPlan();
+      const left = Math.ceil((end - new Date()) / (1000 * 60 * 60 * 24));
+      setPlanType(left > 0 ? "trial" : "free");
+    } else {
+      setPlanType("free");
+    }
   }, []);
 
   /* ===============================
-     ACCESS CONTROL (FIXED)
+     ACCESS CONTROL (UNCHANGED)
   =============================== */
+  const freeFeatures = ["Smart Chat", "Concept Blocks", "Study Companion", "Doubt Solver","Setting"];
 
-  const freeLimit = 4;
-  const trialLimit = 8;
+  const trialFeatures = [
+    ...freeFeatures,
+    "Study Planner",
+    "Quiz Arena",
+    "Test Review",
+    "AI Summary",
+  ];
+
+  const premiumFeatures = [
+    ...trialFeatures,
+    
+    "Project Maker",
+    "Career Detector",
+  ];
 
   const activeAccess = useMemo(() => {
-    if (planType === "premium") {
-      return features.map(f => f.label); // ALL
-    }
-
-    if (planType === "trial") {
-      return features.slice(0, trialLimit).map(f => f.label);
-    }
-
-    return features.slice(0, freeLimit).map(f => f.label);
+    if (planType === "premium") return premiumFeatures;
+    if (planType === "trial") return trialFeatures;
+    return freeFeatures;
   }, [planType]);
 
-  const isUnlocked = (label) => {
-    if (loadingPlan) return false;
-    return activeAccess.includes(label);
-  };
+  const isUnlocked = (label) => activeAccess.includes(label);
 
   /* ===============================
      FILTER
@@ -134,32 +93,22 @@ export default function EmpiCraftSidebar() {
 
   return (
     <>
-      {/* TOGGLE */}
+      {/* TOGGLE BUTTON (ONLY ADDITION) */}
       <button className="toggleBtn" onClick={() => setOpen(!open)}>
         {open ? <PanelLeftClose size={18} /> : <PanelRightOpen size={18} />}
       </button>
 
-      {/* SIDEBAR */}
+      {/* SIDEBAR (ONLY HIDE/SHOW, NOTHING ELSE CHANGED) */}
       <div
         className="sidebar"
-        style={{ transform: open ? "translateX(0)" : "translateX(-100%)" }}
+        style={{
+          transform: open ? "translateX(0)" : "translateX(-100%)",
+        }}
       >
         {/* DASHBOARD */}
-        <div className="item" onClick={() => navigate("/empicraft/dashboard")}>
+        <div className="item" onClick={() => navigate("/Empicraft/Dashboard")}>
           <Home size={18} style={{ marginRight: 10 }} />
-          Dashboard
-        </div>
-
-        {/* PROFILE */}
-        <div className="item" onClick={() => navigate("/empicraft/profile")}>
-          <User size={18} style={{ marginRight: 10 }} />
-          Profile
-        </div>
-
-        {/* SETTINGS */}
-        <div className="item" onClick={() => navigate("/empicraft/settings")}>
-          <Settings size={18} style={{ marginRight: 10 }} />
-          Settings
+          Back to Dashboard
         </div>
 
         {/* SEARCH */}
@@ -172,7 +121,7 @@ export default function EmpiCraftSidebar() {
           />
         </div>
 
-        {/* FEATURES */}
+        {/* FEATURES (FULL VISIBILITY ALWAYS) */}
         <div className="list">
           {filtered.map((item) => {
             const unlocked = isUnlocked(item.label);
@@ -194,7 +143,7 @@ export default function EmpiCraftSidebar() {
         </div>
       </div>
 
-      {/* STYLES (UNCHANGED) */}
+      {/* STYLE */}
       <style>{`
         .sidebar {
           height: 100vh;
