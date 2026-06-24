@@ -116,49 +116,105 @@ export default function EmpiCraftTierSelector() {
   };
 
  const startPremium = async () => {
-  const res = await fetch("https://empiroxmindcraft.in/create-order", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plan: "monthly" }),
-  });
-
-  const data = await res.json();
-  const razorOrder = data.order;
-
-  const options = {
-    key: "YOUR_RAZORPAY_KEY",
-    amount: razorOrder.amount,
-    currency: razorOrder.currency,
-    order_id: razorOrder.id,
-
-    handler: async function (response) {
-      const verifyRes = await fetch(
-        "https://empiroxmindcraft.in/verify-payment",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-            plan: "monthly",
-            user_id: "USER_ID_HERE",
-          }),
-        }
-      );
-
-      const verifyData = await verifyRes.json();
-
-      if (verifyData.success) {
-        navigate("/empicraft/dashboard");
-      } else {
-        alert("Payment failed");
+  try {
+    // 1️⃣ CREATE ORDER
+    const res = await fetch(
+      "https://empirox-backend-production.up.railway.app/create-order",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ plan: "monthly" }),
       }
-    },
-  };
+    );
 
-  const rzp = new window.Razorpay(options);
-  rzp.open();
+    const data = await res.json();
+    console.log("CREATE ORDER RESPONSE:", data);
+
+    // 2️⃣ SAFE CHECK (IMPORTANT)
+    if (!res.ok || !data.success || !data.order) {
+      alert(data.message || "Failed to create order");
+      return;
+    }
+
+    const razorOrder = data.order;
+
+    if (!razorOrder?.id || !razorOrder?.amount) {
+      alert("Invalid order received from server");
+      return;
+    }
+
+    // 3️⃣ CHECK RAZORPAY LOADED
+    if (!window.Razorpay) {
+      alert("Razorpay SDK not loaded");
+      return;
+    }
+
+    // 4️⃣ OPTIONS
+    const options = {
+      key: "YOUR_RAZORPAY_KEY_ID", // replace with real key
+      amount: razorOrder.amount,
+      currency: razorOrder.currency,
+      name: "EmpiCraft",
+      description: "Premium Plan",
+      order_id: razorOrder.id,
+
+      handler: async function (response) {
+        try {
+          console.log("PAYMENT RESPONSE:", response);
+
+          // 5️⃣ VERIFY PAYMENT
+          const verifyRes = await fetch(
+            "https://empirox-backend-production.up.railway.app/verify-payment",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                plan: "monthly",
+                user_id: "USER_ID_HERE",
+              }),
+            }
+          );
+
+          const verifyData = await verifyRes.json();
+          console.log("VERIFY RESPONSE:", verifyData);
+
+          if (verifyData.success) {
+            alert("Payment Successful 🎉");
+            navigate("/empicraft/dashboard");
+          } else {
+            alert(verifyData.message || "Payment verification failed");
+          }
+        } catch (err) {
+          console.error("Verification error:", err);
+          alert("Verification request failed");
+        }
+      },
+
+      theme: {
+        color: "#d4af37",
+      },
+    };
+
+    // 6️⃣ OPEN PAYMENT
+    const rzp = new window.Razorpay(options);
+
+    rzp.on("payment.failed", function (response) {
+      console.error("PAYMENT FAILED:", response.error);
+      alert("Payment failed. Try again.");
+    });
+
+    rzp.open();
+  } catch (err) {
+    console.error("START PREMIUM ERROR:", err);
+    alert("Something went wrong. Please try again.");
+  }
 };
 
   // 2️⃣ ADD THIS FUNCTION INSIDE COMPONENT
