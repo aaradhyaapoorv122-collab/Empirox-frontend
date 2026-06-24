@@ -115,21 +115,51 @@ export default function EmpiCraftTierSelector() {
     navigate("/empicraft/dashboard");
   };
 
-  // PREMIUM PLAN
-  const startPremium = () => {
-    // Razorpay later
-    setPremiumPopup(true);
+ const startPremium = async () => {
+  const res = await fetch("https://empiroxmindcraft.in/create-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan: "monthly" }),
+  });
 
-    setTimeout(() => {
-      localStorage.setItem(PLAN_KEY, "premium");
-      navigate("/empicraft/dashboard");
-    }, 1200);
+  const data = await res.json();
+  const razorOrder = data.order;
+
+  const options = {
+    key: "YOUR_RAZORPAY_KEY",
+    amount: razorOrder.amount,
+    currency: razorOrder.currency,
+    order_id: razorOrder.id,
+
+    handler: async function (response) {
+      const verifyRes = await fetch(
+        "https://empiroxmindcraft.in/verify-payment",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+            plan: "monthly",
+            user_id: "USER_ID_HERE",
+          }),
+        }
+      );
+
+      const verifyData = await verifyRes.json();
+
+      if (verifyData.success) {
+        navigate("/empicraft/dashboard");
+      } else {
+        alert("Payment failed");
+      }
+    },
   };
 
-  const lockedClick = () => {
-    setPopup(true);
-    setTimeout(() => setPopup(false), 2200);
-  };
+  const rzp = new window.Razorpay(options);
+  rzp.open();
+};
 
   // 2️⃣ ADD THIS FUNCTION INSIDE COMPONENT
 const handleLogout = async (e) => {
@@ -149,6 +179,14 @@ const handleLogout = async (e) => {
     localStorage.clear();
     window.location.href = "/login";
   }
+
+};
+const lockedClick = () => {
+  setPopup(true);
+
+  setTimeout(() => {
+    setPopup(false);
+  }, 2200);
 };
 
   const Feature = ({ text }) => (
