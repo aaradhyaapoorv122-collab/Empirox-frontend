@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 // 1️⃣ IMPORT SUPABASE ON TOP
 import { supabase } from "../lib/supabaseClient";
-// use your correct path if different
+// import { AuthContext } from "../context/AuthContext"; // Uncomment if you have this
 
 export default function EmpiCraftTierSelector() {
   const navigate = useNavigate();
@@ -63,15 +63,9 @@ export default function EmpiCraftTierSelector() {
       }
 
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hrs = Math.floor(
-        (diff / (1000 * 60 * 60)) % 24
-      );
-      const mins = Math.floor(
-        (diff / (1000 * 60)) % 60
-      );
-      const secs = Math.floor(
-        (diff / 1000) % 60
-      );
+      const hrs = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const mins = Math.floor((diff / (1000 * 60)) % 60);
+      const secs = Math.floor((diff / 1000) % 60);
 
       setTimeLeft({
         days,
@@ -82,9 +76,7 @@ export default function EmpiCraftTierSelector() {
     };
 
     updateTimer();
-
     const interval = setInterval(updateTimer, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -100,144 +92,137 @@ export default function EmpiCraftTierSelector() {
 
   // START TRIAL
   const startTrial = () => {
-    const alreadyStarted =
-      localStorage.getItem(TRIAL_KEY);
+    const alreadyStarted = localStorage.getItem(TRIAL_KEY);
 
     if (!alreadyStarted) {
-      localStorage.setItem(
-        TRIAL_KEY,
-        new Date().toISOString()
-      );
+      localStorage.setItem(TRIAL_KEY, new Date().toISOString());
     }
 
     localStorage.setItem(PLAN_KEY, "trial");
-
     navigate("/empicraft/dashboard");
   };
 
- const startPremium = async () => {
-  try {
-    const res = await fetch(
-      "https://empirox-backend-production.up.railway.app/create-order",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ plan: "monthly" }),
-      }
-    );
-
-    const data = await res.json();
-    console.log("CREATE ORDER RESPONSE:", data);
-
-    if (!res.ok || !data.success || !data.order) {
-      alert(data.message || "Failed to create order");
-      return;
-    }
-
-    const razorOrder = data.order;
-
-    if (!window.Razorpay) {
-      alert("Razorpay SDK not loaded");
-      return;
-    }
-
-    const options = {
-      key: "rzp_live_T596teW6GxIj86",
-      amount: razorOrder.amount,
-      currency: razorOrder.currency,
-      name: "EmpiCraft",
-      description: "Premium Plan",
-      order_id: razorOrder.id,
-
-      // ✅ IMPORTANT (LIVE STABILITY)
-      prefill: {
-        name: "EmpiCraft User",
-        email: "user@empirox.com",
-        contact: "9999999999",
-      },
-
-      handler: async function (response) {
-        try {
-          const verifyRes = await fetch(
-            "https://empirox-backend-production.up.railway.app/verify-payment",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                plan: "monthly",
-                user_id: "USER_ID_HERE",
-              }),
-            }
-          );
-
-          const verifyData = await verifyRes.json().catch(() => ({}));
-
-          console.log("VERIFY RESPONSE:", verifyData);
-
-          if (verifyData?.success) {
-            alert("Payment Successful 🎉");
-            navigate("/empicraft/dashboard");
-          } else {
-            alert(verifyData?.message || "Payment verification failed");
-          }
-        } catch (err) {
-          console.error("Verification error:", err);
-          alert("Verification request failed");
+  const startPremium = async () => {
+    try {
+      const res = await fetch(
+        "https://empirox-backend-production.up.railway.app/create-order",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ plan: "monthly" }),
         }
-      },
+      );
 
-      theme: {
-        color: "#d4af37",
-      },
-    };
+      const data = await res.json();
+      console.log("CREATE ORDER RESPONSE:", data);
 
-    const rzp = new window.Razorpay(options);
+      if (!res.ok || !data.success || !data.order) {
+        alert(data.message || "Failed to create order");
+        return;
+      }
 
-    rzp.on("payment.failed", function (response) {
-      console.error("PAYMENT FAILED:", response.error);
-      alert(response.error.description || "Payment failed");
-    });
+      const razorOrder = data.order;
 
-    rzp.open();
-  } catch (err) {
-    console.error("START PREMIUM ERROR:", err);
-    alert("Something went wrong. Please try again.");
-  }
-};
+      if (!window.Razorpay) {
+        alert("Razorpay SDK not loaded");
+        return;
+      }
+
+      const options = {
+        key: "rzp_live_T596teW6GxIj86",
+        amount: razorOrder.amount,
+        currency: razorOrder.currency,
+        name: "EmpiCraft",
+        description: "Premium Plan",
+        order_id: razorOrder.id,
+
+        // ✅ IMPORTANT (LIVE STABILITY)
+        prefill: {
+          name: "EmpiCraft User",
+          email: "user@empirox.com",
+          contact: "9999999999",
+        },
+
+        handler: async function (response) {
+          try {
+            const verifyRes = await fetch(
+              "https://empirox-backend-production.up.railway.app/verify-payment",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  plan: "monthly",
+                  user_id: "USER_ID_HERE",
+                }),
+              }
+            );
+
+            const verifyData = await verifyRes.json().catch(() => ({}));
+
+            console.log("VERIFY RESPONSE:", verifyData);
+
+            if (verifyData?.success) {
+              alert("Payment Successful 🎉");
+              navigate("/empicraft/dashboard");
+            } else {
+              alert(verifyData?.message || "Payment verification failed");
+            }
+          } catch (err) {
+            console.error("Verification error:", err);
+            alert("Verification request failed");
+          }
+        },
+        theme: {
+          color: "#d4af37",
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+
+      rzp.on("payment.failed", function (response) {
+        console.error("PAYMENT FAILED:", response.error);
+        alert(response.error.description || "Payment failed");
+      });
+
+      rzp.open();
+    } catch (err) {
+      console.error("START PREMIUM ERROR:", err);
+      alert("Something went wrong. Please try again.");
+    }
+  };
+
   // 2️⃣ ADD THIS FUNCTION INSIDE COMPONENT
-const handleLogout = async (e) => {
-  if (e) e.stopPropagation();
+  const handleLogout = async (e) => {
+    if (e) e.stopPropagation();
 
-  try {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      localStorage.clear();
+      
+      // Ensure AuthContext is imported and handled properly
+      // const { login } = useContext(AuthContext);
+      // if (login) login(null);
 
-    localStorage.clear();
+      window.location.href = "/login";
+    } catch (err) {
+      localStorage.clear();
+      window.location.href = "/login";
+    }
+  };
 
-    const { login } = useContext(AuthContext);
-    login(null);
-
-    window.location.href = "/login";
-
-  } catch (err) {
-    localStorage.clear();
-    window.location.href = "/login";
-  }
-
-};
-const lockedClick = () => {
-  setPopup(true);
-
-  setTimeout(() => {
-    setPopup(false);
-  }, 2200);
-};
+  const lockedClick = () => {
+    setPopup(true);
+    setTimeout(() => {
+      setPopup(false);
+    }, 2200);
+  };
 
   const Feature = ({ text }) => (
     <div style={styles.featureRow}>
@@ -246,42 +231,33 @@ const lockedClick = () => {
     </div>
   );
 
-
   return (
     <div style={styles.page}>
       {/* Locked Popup */}
       {popup && (
-        <div style={styles.popup}>
-          🔒 Upgrade to Premium to unlock
-        </div>
+        <div style={styles.popup}>🔒 Upgrade to Premium to unlock</div>
       )}
 
       {/* Premium Popup */}
       {premiumPopup && (
-        <div style={styles.popup}>
-          💳 Payment gateway coming soon...
-        </div>
+        <div style={styles.popup}>💳 Payment gateway coming soon...</div>
       )}
 
       <div style={styles.wrapper}>
         {/* HEADER */}
-       <div style={styles.header}>
-  <div style={styles.logo}>👑</div>
+        <div style={styles.header}>
+          <div style={styles.headerTopWrap}>
+             <div style={styles.logo}>👑</div>
+             <div style={styles.brand}>EmpiCraft</div>
+          </div>
 
-  <div style={styles.brand}>EmpiCraft</div>
+          <div style={styles.tag}>AI Learning. Unlimited Potential.</div>
 
-  <div style={styles.tag}>
-    AI Learning. Unlimited Potential.
-  </div>
+          <button style={styles.logoutBtn} onClick={handleLogout}>
+            Logout ↗
+          </button>
+        </div>
 
-  <button
-    style={styles.logoutBtn}
-    onClick={handleLogout}
-  >
-    Logout ↗
-  </button>
-</div>
-  
         {/* MAIN CARD */}
         <div style={styles.mainCard}>
           {/* FREE */}
@@ -289,26 +265,15 @@ const lockedClick = () => {
             <div style={styles.row}>
               <div style={styles.leftBox}>
                 <div style={styles.iconBox}>📦</div>
-
                 <div>
-                  <div style={styles.title}>
-                    FREE PLAN
-                  </div>
-
-                  <div style={styles.badgeDark}>
-                    4 Features
-                  </div>
-
+                  <div style={styles.title}>FREE PLAN</div>
+                  <div style={styles.badgeDark}>4 Features</div>
                   <div style={styles.desc}>
                     Start your learning
                     <br />
                     journey with basics.
                   </div>
-
-                  <button
-                    style={styles.freeBtn}
-                    onClick={startFree}
-                  >
+                  <button style={styles.freeBtn} onClick={startFree}>
                     Start Free →
                   </button>
                 </div>
@@ -322,9 +287,7 @@ const lockedClick = () => {
               </div>
             </div>
 
-            <div style={styles.premiumRibbon}>
-              💎 PREMIUM
-            </div>
+            <div style={styles.premiumRibbon}>💎 PREMIUM</div>
           </div>
 
           <div style={styles.line}></div>
@@ -334,16 +297,9 @@ const lockedClick = () => {
             <div style={styles.row}>
               <div style={styles.leftBox}>
                 <div style={styles.goldIcon}>⚡</div>
-
                 <div>
-                  <div style={styles.goldTitle}>
-                    3-MONTH TRIAL
-                  </div>
-
-                  <div style={styles.badgeGold}>
-                    8 Core Features
-                  </div>
-
+                  <div style={styles.goldTitle}>3-MONTH TRIAL</div>
+                  <div style={styles.badgeGold}>8 Core Features</div>
                   <div style={styles.goldDesc}>
                     Unlock powerful AI tools
                     <br />
@@ -364,33 +320,20 @@ const lockedClick = () => {
               </div>
 
               <div style={styles.timerBox}>
-                <div style={styles.timerLabel}>
-                  TRIAL ENDS IN
-                </div>
-
+                <div style={styles.timerLabel}>TRIAL ENDS IN</div>
                 <div style={styles.timerNumber}>
-                  {timeLeft.days}d :
-                  {timeLeft.hrs}h :
-                  {timeLeft.mins}m :
+                  {timeLeft.days}d : {timeLeft.hrs}h : {timeLeft.mins}m :{" "}
                   {timeLeft.secs}s
                 </div>
-
                 <div style={styles.timerText}>
                   Real live timer based on
                   <br />
                   your trial activation.
                 </div>
-
-                <button
-                  style={styles.freeBtn}
-                  onClick={startTrial}
-                >
+                <button style={styles.freeBtn} onClick={startTrial}>
                   Start Trial →
                 </button>
-
-                <div style={styles.smallText}>
-                  No payment needed now
-                </div>
+                <div style={styles.smallText}>No payment needed now</div>
               </div>
             </div>
           </div>
@@ -402,73 +345,42 @@ const lockedClick = () => {
             <div style={styles.row}>
               <div style={styles.leftBox}>
                 <div style={styles.goldIcon}>👑</div>
-
                 <div>
-                  <div style={styles.goldTitle}>
-                    PREMIUM PLAN
-                  </div>
-
-                  <div style={styles.badgeGold}>
-                    All 11 Features
-                  </div>
-
-                  <div style={styles.desc}>
-                    Everything unlocked.
-                  </div>
+                  <div style={styles.goldTitle}>PREMIUM PLAN</div>
+                  <div style={styles.badgeGold}>All 11 Features</div>
+                  <div style={styles.desc}>Everything unlocked.</div>
                 </div>
               </div>
 
               <div style={styles.rightList}>
-                
                 <Feature text="Career Detector" />
                 <Feature text="Project Builder" />
               </div>
 
               <div style={styles.priceBox}>
                 <div style={styles.price}>
-                  ₹199
-                  <span style={styles.month}>
-                    /month
-                  </span>
+                  ₹199<span style={styles.month}>/month</span>
                 </div>
-
-                <button
-                  style={styles.goldButton}
-                  onClick={startPremium}
-                >
+                <button style={styles.goldButton} onClick={startPremium}>
                   Upgrade Premium 👑
                 </button>
-
-                <div style={styles.smallText}>
-                  Razorpay next step later
-                </div>
+                <div style={styles.smallText}>Razorpay next step later</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* LOCKED */}
-        <div style={styles.lockTitle}>
-          🔒 PREMIUM FEATURES 🔒
-        </div>
+        <div style={styles.lockTitle}>🔒 PREMIUM FEATURES 🔒</div>
 
         <div style={styles.cardsWrap}>
           {[
-            
             ["🎯", "Career Detector"],
             ["🚀", "Project Builder"],
           ].map((item, i) => (
-            <div
-              key={i}
-              style={styles.lockCard}
-              onClick={lockedClick}
-            >
-              <div style={styles.bigIcon}>
-                {item[0]}
-              </div>
-              <div style={styles.cardTitle}>
-                {item[1]}
-              </div>
+            <div key={i} style={styles.lockCard} onClick={lockedClick}>
+              <div style={styles.bigIcon}>{item[0]}</div>
+              <div style={styles.cardTitle}>{item[1]}</div>
             </div>
           ))}
         </div>
@@ -478,7 +390,7 @@ const lockedClick = () => {
 }
 
 /* ===============================
-   STYLES (same UI kept)
+   STYLES (Optimized for PC & Mobile)
 =============================== */
 
 const gold = "#d4af37";
@@ -486,72 +398,84 @@ const gold = "#d4af37";
 const styles = {
   page: {
     minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top,#141414,#050505 60%)",
-    padding: "25px",
+    background: "radial-gradient(circle at top,#141414,#050505 60%)",
+    padding: "clamp(15px, 4vw, 25px)", // Dynamic padding
     color: "white",
     fontFamily: "Inter, sans-serif",
+    boxSizing: "border-box",
   },
 
   wrapper: {
     maxWidth: "1180px",
+    width: "100%",
     margin: "0 auto",
   },
 
   header: {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  flexWrap: "wrap",
-  gap: "12px",
-  textAlign: "center",
-  marginBottom: "25px",
-},
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexDirection: "row",
+    flexWrap: "wrap", // Wraps gracefully on mobile
+    gap: "12px",
+    textAlign: "center",
+    marginBottom: "25px",
+  },
+  
+  headerTopWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    flex: "1 1 auto",
+  },
 
-  logo: { fontSize: "42px" },
+  logo: { 
+    fontSize: "clamp(28px, 5vw, 42px)" // Scales down on smaller screens
+  },
 
   brand: {
-    fontSize: "56px",
+    fontSize: "clamp(36px, 8vw, 56px)",
     fontWeight: "800",
     color: gold,
   },
 
   tag: {
-  color: "#aaa",
-  fontSize: "20px",
-  width: "100%",
-  textAlign: "center",
-  marginTop: "8px",
-},
+    color: "#aaa",
+    fontSize: "clamp(16px, 4vw, 20px)",
+    width: "100%",
+    textAlign: "left",
+    marginTop: "8px",
+    flexBasis: "100%",
+  },
 
   mainCard: {
+    position: "relative", // So ribbon aligns properly
     border: `1px solid ${gold}55`,
     borderRadius: "28px",
-    background:
-      "linear-gradient(145deg,#080808,#0f0f0f)",
+    background: "linear-gradient(145deg,#080808,#0f0f0f)",
     overflow: "hidden",
   },
 
-  section: { padding: "30px" },
+  section: { padding: "clamp(20px, 5vw, 30px)" },
   sectionGlow: {
-    padding: "30px",
+    padding: "clamp(20px, 5vw, 30px)",
     background: "rgba(212,175,55,0.03)",
   },
 
   row: {
     display: "flex",
     gap: "28px",
-    flexWrap: "wrap",
+    flexWrap: "wrap", // Crucial for mobile stacking
   },
 
   leftBox: {
-    width: "300px",
+    flex: "1 1 250px", // Allows scaling but prevents squeezing too much
     display: "flex",
     gap: "18px",
   },
 
   iconBox: {
-    width: "72px",
+    minWidth: "72px",
     height: "72px",
     borderRadius: "18px",
     background: "#151515",
@@ -562,11 +486,10 @@ const styles = {
   },
 
   goldIcon: {
-    width: "72px",
+    minWidth: "72px",
     height: "72px",
     borderRadius: "18px",
-    background:
-      "linear-gradient(145deg,#f6d76f,#7b5a00)",
+    background: "linear-gradient(145deg,#f6d76f,#7b5a00)",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -575,12 +498,12 @@ const styles = {
   },
 
   title: {
-    fontSize: "34px",
+    fontSize: "clamp(24px, 6vw, 34px)",
     fontWeight: "800",
   },
 
   goldTitle: {
-    fontSize: "34px",
+    fontSize: "clamp(24px, 6vw, 34px)",
     fontWeight: "800",
     color: gold,
   },
@@ -591,6 +514,7 @@ const styles = {
     borderRadius: "20px",
     background: "#1b1b1b",
     display: "inline-block",
+    fontSize: "14px",
   },
 
   badgeGold: {
@@ -600,18 +524,21 @@ const styles = {
     background: `${gold}22`,
     display: "inline-block",
     color: gold,
+    fontSize: "14px",
   },
 
   desc: {
     marginTop: "14px",
     color: "#aaa",
     lineHeight: "1.6",
+    fontSize: "15px",
   },
 
   goldDesc: {
     marginTop: "14px",
     color: "#f7e2a0",
     lineHeight: "1.6",
+    fontSize: "15px",
   },
 
   freeBtn: {
@@ -622,6 +549,8 @@ const styles = {
     color: "white",
     border: "none",
     cursor: "pointer",
+    width: "100%", // Takes full width on mobile
+    maxWidth: "200px",
   },
 
   goldButton: {
@@ -629,29 +558,33 @@ const styles = {
     width: "100%",
     padding: "14px",
     borderRadius: "14px",
-    background:
-      "linear-gradient(145deg,#f6d76f,#c89717)",
+    background: "linear-gradient(145deg,#f6d76f,#c89717)",
     border: "none",
     fontWeight: "800",
     cursor: "pointer",
   },
 
-  rightList: { flex: 1 },
+  rightList: { 
+    flex: "1 1 200px", // Gives it flexibility to wrap properly
+  },
 
   featureRow: {
     display: "flex",
     gap: "10px",
     marginBottom: "10px",
+    fontSize: "15px",
   },
 
   tick: { color: gold },
 
   timerBox: {
-    width: "280px",
+    flex: "1 1 250px", // Makes it fluid for mobile
+    maxWidth: "100%",
     border: `1px solid ${gold}55`,
     borderRadius: "20px",
     padding: "20px",
     background: "#0b0b0b",
+    boxSizing: "border-box",
   },
 
   timerLabel: {
@@ -663,7 +596,7 @@ const styles = {
   timerNumber: {
     marginTop: "15px",
     textAlign: "center",
-    fontSize: "24px",
+    fontSize: "clamp(20px, 5vw, 24px)",
     fontWeight: "800",
   },
 
@@ -671,14 +604,17 @@ const styles = {
     textAlign: "center",
     marginTop: "14px",
     color: "#aaa",
+    fontSize: "14px",
   },
 
   priceBox: {
-    width: "280px",
+    flex: "1 1 250px",
+    maxWidth: "100%",
     border: `1px solid ${gold}55`,
     borderRadius: "20px",
     padding: "20px",
     background: "#0b0b0b",
+    boxSizing: "border-box",
   },
 
   price: {
@@ -695,8 +631,7 @@ const styles = {
 
   line: {
     height: "1px",
-    background:
-      "linear-gradient(90deg,transparent,#d4af37,transparent)",
+    background: "linear-gradient(90deg,transparent,#d4af37,transparent)",
   },
 
   premiumRibbon: {
@@ -707,33 +642,33 @@ const styles = {
     background: gold,
     color: "#000",
     fontWeight: "800",
+    fontSize: "clamp(10px, 3vw, 14px)", // Avoids overflow
+    borderBottomLeftRadius: "14px",
   },
-  // 4️⃣ ADD THIS STYLE INSIDE styles OBJECT
 
-logoutBtn: {
-  marginTop: "18px",
-  padding: "12px 18px",
-  borderRadius: "12px",
-  background: "#111",
-  color: "#d4af37",
-  border: "1px solid #d4af37",
-  cursor: "pointer",
-  fontWeight: "800",
-  fontSize: "15px",
-},
+  logoutBtn: {
+    marginTop: "10px",
+    padding: "10px 18px",
+    borderRadius: "12px",
+    background: "#111",
+    color: "#d4af37",
+    border: "1px solid #d4af37",
+    cursor: "pointer",
+    fontWeight: "800",
+    fontSize: "15px",
+  },
 
   lockTitle: {
     textAlign: "center",
     marginTop: "30px",
-    fontSize: "24px",
+    fontSize: "clamp(20px, 5vw, 24px)",
     color: gold,
     fontWeight: "800",
   },
 
   cardsWrap: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit,minmax(220px,1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", // Automatically handles responsiveness perfectly
     gap: "18px",
     marginTop: "18px",
   },
